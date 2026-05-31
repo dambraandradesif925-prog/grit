@@ -51,7 +51,10 @@ const Header: React.FC = () => {
   }, []);
 
   const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
+    let element = document.getElementById(id);
+    if (!element) {
+      element = document.getElementById(`home-sec-${id}`);
+    }
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
@@ -69,6 +72,18 @@ const Header: React.FC = () => {
       }
     } else {
       setMobileMenuOpen(false);
+    }
+  };
+
+  const handleLoansClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMobileMenuOpen(false);
+    setProductsMenuOpen(false);
+    if (location.pathname === "/") {
+      scrollToSection("loans");
+    } else {
+      navigate("/");
+      setTimeout(() => scrollToSection("loans"), 150);
     }
   };
 
@@ -122,8 +137,8 @@ const Header: React.FC = () => {
             <div ref={dropdownRef} className="relative" id="nav-dropdown-products">
               <button
                 onMouseEnter={() => setProductsMenuOpen(true)}
-                onClick={() => setProductsMenuOpen(!productsMenuOpen)}
-                className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 rounded-md transition-colors hover:text-amber-500"
+                onClick={handleLoansClick}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 rounded-md transition-colors hover:text-amber-500 cursor-pointer"
                 id="nav-btn-products"
               >
                 貸款項目
@@ -137,6 +152,13 @@ const Header: React.FC = () => {
                   onMouseLeave={() => setProductsMenuOpen(false)}
                   id="nav-dropdown-menu"
                 >
+                  {/* Option to view/scroll to all products in home page */}
+                  <button
+                    onClick={handleLoansClick}
+                    className="block w-full text-left px-4 py-2.5 text-sm font-semibold text-amber-500 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    所有貸款項目 &raquo;
+                  </button>
                   {products.length > 0 ? (
                     products.map(p => (
                       <Link
@@ -254,6 +276,13 @@ const Header: React.FC = () => {
               </button>
               {productsMenuOpen && (
                 <div className="pl-6 space-y-1 mt-1 bg-gray-50 rounded-md py-1" id="nav-mobile-products-list">
+                  <button
+                    onClick={handleLoansClick}
+                    className="block w-full text-left px-3 py-2 text-sm font-semibold text-amber-500 hover:text-amber-600"
+                    id="nav-mobile-loan-all"
+                  >
+                    所有貸款項目 &raquo;
+                  </button>
                   {products.map(p => (
                     <Link
                       key={p.slug}

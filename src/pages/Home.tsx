@@ -131,7 +131,7 @@ const Home: React.FC = () => {
                 立即線上申請
               </Link>
               <a
-                href="#contact"
+                href="#home-sec-contact"
                 className="inline-flex items-center justify-center px-6 py-3.5 rounded-md border border-white/50 text-white font-semibold text-center hover:bg-white/10 transition-colors"
                 id="hero-cta-contact"
               >

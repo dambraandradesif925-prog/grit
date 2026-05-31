@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+@theme {
+  --color-amber-50: #fff5f5;
+  --color-amber-100: #ffe3e3;
+  --color-amber-200: #ffc9c9;
+  --color-amber-300: #ffa8a8;
+  --color-amber-400: #ff8787;
+  --color-amber-500: #b91c1c; /* Elegant Cardinal Red */
+  --color-amber-600: #991b1b; /* Brighter Crimson */
+  --color-amber-700: #7f1d1d; /* Deep Brick Red */
+  --color-amber-800: #5f1212; /* Dark Burgundy */
+  --color-amber-950: #450a0a; /* Deepest Wine */
+
+  --color-teal-950: #540003; /* Soft Midnight Burgundy for hero/card backgrounds */
+}
