@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
-import { logoUrl } from '../components/Header';
+import { getCachedLogo, fetchUpdatedImages } from '../lib/siteImages';
 import { LogIn, Key, Mail, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 
 const Login: React.FC = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const [logo, setLogo] = useState(getCachedLogo());
+  
+  useEffect(() => {
+    fetchUpdatedImages(setLogo);
+  }, []);
   
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -88,7 +93,7 @@ const Login: React.FC = () => {
           {/* Brand Header */}
           <div className="flex flex-col items-center mb-4 select-none">
             <img 
-              src={logoUrl} 
+              src={logo} 
               alt="富毅信貸有限公司" 
               className="h-16 w-auto object-contain mb-3" 
               onError={(e) => {

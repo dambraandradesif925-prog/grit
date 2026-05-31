@@ -7,12 +7,14 @@ import {
   defaultThankYouMsg,
   defaultCompanyAddress,
   defaultLicenseNumber,
-  defaultComplaintHotline
+  defaultComplaintHotline,
+  fallbackProducts
 } from '../types';
 import { 
   User, CheckCircle, Clock, AlertTriangle, Play, Save, 
   RefreshCw, KanbanSquare, Pencil, Sparkles, BookOpen, 
-  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign
+  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -29,7 +31,7 @@ const Dashboard: React.FC = () => {
   // Common loading states
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
-  const [tab, setTab] = useState<'applications' | 'accounts' | 'settings' | 'faqs'>('applications');
+  const [tab, setTab] = useState<'applications' | 'accounts' | 'settings' | 'faqs' | 'images'>('applications');
 
   // Client states
   const [clientAccounts, setClientAccounts] = useState<any[]>([]);
@@ -51,6 +53,13 @@ const Dashboard: React.FC = () => {
     hotline: defaultComplaintHotline
   });
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Site images state (Admin editable)
+  const [logoInput, setLogoInput] = useState('');
+  const [heroInput, setHeroInput] = useState('');
+  const [savingImages, setSavingImages] = useState(false);
+  const [productsImages, setProductsImages] = useState<{ id: string, slug: string, title: string, image_url: string }[]>([]);
+  const [savingProductImgSlug, setSavingProductImgSlug] = useState<string | null>(null);
 
   // Load dashboard dataset
   const loadDashboardData = async () => {
@@ -86,6 +95,25 @@ const Dashboard: React.FC = () => {
             address: a,
             hotline: h
           });
+
+          // Logo & Hero Images
+          const logoVal = settingsData.find(s => s.key === "logo_url")?.value || "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+          const heroVal = settingsData.find(s => s.key === "hero_background_url")?.value || "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
+          setLogoInput(logoVal);
+          setHeroInput(heroVal);
+        }
+
+        // Fetch products
+        const { data: prodData } = await supabase.from("loan_products").select("id, slug, title, image_url").order("sort_order", { ascending: true });
+        if (prodData && prodData.length > 0) {
+          setProductsImages(prodData);
+        } else {
+          setProductsImages(fallbackProducts.map(p => ({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            image_url: p.image_url
+          })));
         }
       } else {
         // --- Client Member Dashboard Load ---
@@ -195,6 +223,59 @@ const Dashboard: React.FC = () => {
       alert("參數修改失敗：" + err.message);
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  // Admin action: save updated logo & hero images in settings
+  const handleSaveLogoHero = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingImages(true);
+    try {
+      const operations = [
+        { key: "logo_url", value: logoInput },
+        { key: "hero_background_url", value: heroInput }
+      ];
+
+      await Promise.all(operations.map(async (op) => {
+        const { data } = await supabase.from("site_settings").select("id").eq("key", op.key).maybeSingle();
+        if (data) {
+          await supabase.from("site_settings").update({ value: op.value }).eq("key", op.key);
+        } else {
+          await supabase.from("site_settings").insert({ key: op.key, value: op.value });
+        }
+      }));
+
+      // Cache updated values locally so they reflect instantly
+      localStorage.setItem('site_logo_url', logoInput);
+      localStorage.setItem('site_hero_url', heroInput);
+
+      setToastMessage("✓ 品牌與宣傳大圖更變儲存成功！");
+      setTimeout(() => setToastMessage(''), 3000);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("儲存圖片失敗：" + err.message);
+    } finally {
+      setSavingImages(false);
+    }
+  };
+
+  // Admin action: save updated loan product image
+  const handleSaveProductImage = async (slug: string, newUrl: string) => {
+    setSavingProductImgSlug(slug);
+    try {
+      const { error } = await supabase
+        .from('loan_products')
+        .update({ image_url: newUrl })
+        .eq('slug', slug);
+
+      if (error) throw error;
+      setToastMessage("✓ 貸款產品封面圖片更新成功！");
+      setTimeout(() => setToastMessage(''), 3000);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("產品圖片儲存失敗：" + err.message);
+    } finally {
+      setSavingProductImgSlug(null);
     }
   };
 
@@ -316,6 +397,17 @@ const Dashboard: React.FC = () => {
                 }`}
               >
                 網站全域核心設定
+              </button>
+              <button
+                onClick={() => setTab('images')}
+                className={`px-4 py-2.5 text-xs font-extrabold tracking-wider uppercase border-b-2 transition-all ${
+                  tab === 'images' 
+                    ? "border-amber-500 text-amber-500" 
+                    : "border-transparent text-gray-400 hover:text-gray-700"
+                }`}
+                id="tab-btn-images"
+              >
+                網站所有圖片管理
               </button>
             </div>
 
@@ -537,7 +629,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-100 flex justify-end">
+                                  <div className="pt-4 border-t border-gray-100 flex justify-end">
                     <button
                       type="submit"
                       disabled={savingSettings}
@@ -549,6 +641,108 @@ const Dashboard: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {tab === 'images' && (
+              <div className="space-y-6 animate-fade-in" id="panel-images">
+                {/* 1. Global site brand & hero banner background images */}
+                <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-6">
+                  <div className="border-b border-gray-100 pb-3 flex items-center gap-2">
+                    <ImageIcon className="text-amber-500" size={18} />
+                    <h3 className="text-base font-bold text-gray-900">官方品牌與網站核心圖庫設定</h3>
+                  </div>
+
+                  <form onSubmit={handleSaveLogoHero} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Logo URL */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          傳載官方品牌標誌 (Website Logo URL)
+                        </label>
+                        <div className="flex gap-4">
+                          <div className="w-16 h-16 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center shrink-0">
+                            {logoInput ? (
+                              <img src={logoInput} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://grit-credit.com/assets/logo-D_TUe9TF.jpg'; }} />
+                            ) : (
+                              <span className="text-xs text-gray-400">無預覽</span>
+                            )}
+                          </div>
+                          <div className="flex-1 col-span-1">
+                            <input
+                              type="text"
+                              value={logoInput}
+                              onChange={(e) => setLogoInput(e.target.value)}
+                              placeholder="貼上新的 Logo 圖片 URL"
+                              className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 text-slate-800 mb-1"
+                            />
+                            <p className="text-[10px] text-gray-400">當前支持任何網路公開圖片連結位址</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Hero Image */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          首頁主板大背景圖 (Hero Background URL)
+                        </label>
+                        <div className="flex gap-4">
+                          <div className="w-16 h-16 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center shrink-0">
+                            {heroInput ? (
+                              <img src={heroInput} alt="Hero" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg'; }} />
+                            ) : (
+                              <span className="text-xs text-gray-400">無預覽</span>
+                            )}
+                          </div>
+                          <div className="flex-1 col-span-1">
+                            <input
+                              type="text"
+                              value={heroInput}
+                              onChange={(e) => setHeroInput(e.target.value)}
+                              placeholder="貼上主板大景大宣傳圖片 URL"
+                              className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 text-slate-800 mb-1"
+                            />
+                            <p className="text-[10px] text-gray-400">用於首頁頂部歡迎版塊做全螢幕大圖展示</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-gray-100">
+                      <button
+                        type="submit"
+                        disabled={savingImages}
+                        className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <Save size={14} />
+                        {savingImages ? "更新存儲中..." : "保存全域主要圖片變更"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 2. Loan products image cards list */}
+                <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-6">
+                  <div className="border-b border-gray-100 pb-3 flex items-center gap-2">
+                    <ImageIcon className="text-amber-500" size={18} />
+                    <h3 className="text-base font-bold text-gray-900">貸款諮詢項目封面圖設定</h3>
+                  </div>
+
+                  <p className="text-xs text-gray-405 leading-relaxed -mt-2">
+                    所有會看見的申請按鈕、貸款細節導向卡片均會即刻使用此模塊更變後的產品縮圖。貼上新連結點按即可直接單獨保存！
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    {productsImages.map((prod) => (
+                      <ProductImageRow 
+                        key={prod.slug}
+                        product={prod}
+                        onSave={handleSaveProductImage}
+                        isSaving={savingProductImgSlug === prod.slug}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -680,6 +874,57 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
+      </div>
+    </div>
+  );
+};
+
+interface ProductImageRowProps {
+  product: { id: string, slug: string, title: string, image_url: string };
+  onSave: (slug: string, newUrl: string) => Promise<void>;
+  isSaving: boolean;
+}
+
+const ProductImageRow: React.FC<ProductImageRowProps> = ({ product, onSave, isSaving }) => {
+  const [url, setUrl] = useState(product.image_url);
+
+  return (
+    <div className="p-4 border border-gray-100 rounded-xl bg-gray-50 flex flex-col sm:flex-row gap-4" id={`prod-img-row-${product.slug}`}>
+      <div className="w-full sm:w-28 h-20 border border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center shrink-0 shadow-inner">
+        {url ? (
+          <img 
+            src={url} 
+            alt={product.title} 
+            className="w-full h-full object-cover" 
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg';
+            }}
+          />
+        ) : (
+          <span className="text-xs text-gray-400">無預覽</span>
+        )}
+      </div>
+      <div className="flex-1 flex flex-col justify-between space-y-2">
+        <div>
+          <h4 className="text-xs font-extrabold text-slate-800 mb-1">{product.title} ({product.slug})</h4>
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="貼上貸款產品封面圖 URL"
+            className="w-full h-9 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 text-slate-800"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={() => onSave(product.slug, url)}
+            disabled={isSaving || url === product.image_url}
+            className="px-3 h-8 rounded-md bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 text-white text-[10px] font-bold tracking-wider uppercase transition-all flex items-center gap-1 shadow-sm"
+          >
+            <Save size={10} />
+            {isSaving ? "更新中..." : "保存項目圖"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,36 @@
+import { supabase } from './supabase';
+
+export const fallbackLogo = "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+export const fallbackHero = "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
+
+export function getCachedLogo(): string {
+  return localStorage.getItem('site_logo_url') || fallbackLogo;
+}
+
+export function getCachedHero(): string {
+  return localStorage.getItem('site_hero_url') || fallbackHero;
+}
+
+export async function fetchUpdatedImages(
+  onLogoUpdate?: (url: string) => void,
+  onHeroUpdate?: (url: string) => void
+) {
+  try {
+    const { data } = await supabase.from('site_settings').select('key, value');
+    if (data) {
+      const logo = data.find(s => s.key === 'logo_url')?.value;
+      const hero = data.find(s => s.key === 'hero_background_url')?.value;
+      
+      if (logo) {
+        localStorage.setItem('site_logo_url', logo);
+        if (onLogoUpdate) onLogoUpdate(logo);
+      }
+      if (hero) {
+        localStorage.setItem('site_hero_url', hero);
+        if (onHeroUpdate) onHeroUpdate(hero);
+      }
+    }
+  } catch (err) {
+    console.error("Error fetching site images", err);
+  }
+}

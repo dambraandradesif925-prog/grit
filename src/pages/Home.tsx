@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getCachedHero, fetchUpdatedImages } from '../lib/siteImages';
 import { 
   LoanProduct, 
   Advantage, 
@@ -26,6 +27,7 @@ const Home: React.FC = () => {
   const [advantages, setAdvantages] = useState<Advantage[]>(fallbackAdvantages);
   const [faqs, setFaqs] = useState<FAQ[]>(fallbackFAQs);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [heroBg, setHeroBg] = useState<string>(getCachedHero());
 
   // Calculator State
   const [calcAmount, setCalcAmount] = useState<number>(50000);
@@ -37,6 +39,8 @@ const Home: React.FC = () => {
   const [contactLoading, setContactLoading] = useState(false);
 
   useEffect(() => {
+    fetchUpdatedImages(undefined, setHeroBg);
+    
     // Fetch products
     supabase
       .from("loan_products")
@@ -98,7 +102,7 @@ const Home: React.FC = () => {
         id="home-hero" 
         className="relative bg-teal-950 text-white overflow-hidden py-24 px-4 sm:px-6 lg:px-8 border-b-4 border-amber-500"
         style={{
-          backgroundImage: `linear-gradient(rgba(13, 27, 42, 0.75), rgba(13, 27, 42, 0.85)), url('https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg')`,
+          backgroundImage: `linear-gradient(rgba(13, 27, 42, 0.75), rgba(13, 27, 42, 0.85)), url('${heroBg}')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat'
@@ -519,9 +523,9 @@ const Home: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-150 p-6 space-y-6" id="contact-map-info">
               <h3 className="text-lg font-bold text-gray-900">總行辦公室位置</h3>
               <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-150 border border-gray-250 relative" id="contact-iframe-map">
-                {/* Standard Google Interactive Map for Hollywood Commercial Centre, Mong Kok */}
+                {/* Standard Google Interactive Map for Admiralty Centre, Admiralty */}
                 <iframe 
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3691.312151608!2d114.16875087595511!3d22.31536764273295!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x340400c436979deb%3A0xe5a140f04cbb6c24!2sHollywood%20Plaza%2C%20610%20Nathan%20Rd%2C%20Mong%20Kok!5e0!3m2!1sen!2shk!4v1711200000000!5m2!1sen!2shk"
+                  src="https://maps.google.com/maps?q=香港夏愨道18號海富中心&t=&z=16&ie=UTF8&iwloc=&output=embed"
                   width="100%" 
                   height="100%" 
                   style={{ border: 0 }} 
@@ -535,7 +539,7 @@ const Home: React.FC = () => {
               <div className="text-sm space-y-2 text-gray-600 leading-relaxed font-medium">
                 <p className="flex items-center gap-2">
                   <span className="bg-amber-100 text-amber-500 font-bold px-2 py-0.5 rounded text-[11px] font-mono">港鐵地鐵站</span>
-                  <span>旺角站 E2 出口，沿彌敦道步行約 2 分鐘即達荷李活商業中心。</span>
+                  <span>金鐘站 A 出口，直達海富中心，步行約 1 分鐘即可抵達第 1 座。</span>
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="bg-amber-100 text-amber-500 font-bold px-2 py-0.5 rounded text-[11px] font-mono">放債資格</span>

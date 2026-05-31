@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { LoanProduct } from '../types';
 
+import { getCachedLogo, fetchUpdatedImages } from '../lib/siteImages';
+
 // The navigation menu definition from the scraped bundle
 const navItems = [
   { label: "首頁", href: "/", hash: "" },
@@ -22,6 +24,7 @@ const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
   const [products, setProducts] = useState<Pick<LoanProduct, 'slug' | 'title'>[]>([]);
+  const [logo, setLogo] = useState(getCachedLogo());
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const location = useLocation();
@@ -29,6 +32,8 @@ const Header: React.FC = () => {
   const { user, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
+    fetchUpdatedImages(setLogo);
+    
     supabase
       .from("loan_products")
       .select("slug, title")
@@ -100,7 +105,7 @@ const Header: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0" id="nav-logo-link">
             <img 
-              src={logoUrl} 
+              src={logo} 
               alt="富毅信貸有限公司" 
               className="h-10 w-auto object-contain" 
               id="nav-logo-img"
