@@ -525,7 +525,7 @@ const Home: React.FC = () => {
               <div className="aspect-video w-full rounded-xl overflow-hidden bg-gray-150 border border-gray-250 relative" id="contact-iframe-map">
                 {/* Standard Google Interactive Map for Admiralty Centre, Admiralty */}
                 <iframe 
-                  src="https://maps.google.com/maps?q=香港夏愨道18號海富中心&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                  src="https://maps.google.com/maps?q=香港夏愨道18號海富中心座1201室&t=&z=16&ie=UTF8&iwloc=&output=embed"
                   width="100%" 
                   height="100%" 
                   style={{ border: 0 }} 

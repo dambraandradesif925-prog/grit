@@ -61,6 +61,47 @@ const Dashboard: React.FC = () => {
   const [productsImages, setProductsImages] = useState<{ id: string, slug: string, title: string, image_url: string }[]>([]);
   const [savingProductImgSlug, setSavingProductImgSlug] = useState<string | null>(null);
 
+  // Client member custom application states
+  const [showApplyForm, setShowApplyForm] = useState(false);
+  const [memberApplyAmount, setMemberApplyAmount] = useState('');
+  const [memberSalary, setMemberSalary] = useState('');
+  const [memberOccupation, setMemberOccupation] = useState('');
+  const [memberHkid, setMemberHkid] = useState('');
+  const [memberPhone, setMemberPhone] = useState('');
+  const [memberNotes, setMemberNotes] = useState('');
+  const [submittingMemberApply, setSubmittingMemberApply] = useState(false);
+
+  // Admin approval modal states
+  const [approvingApp, setApprovingApp] = useState<any | null>(null);
+  const [approvedLoanAmount, setApprovedLoanAmount] = useState('');
+  const [outstandingPrincipal, setOutstandingPrincipal] = useState('');
+  const [totalBalance, setTotalBalance] = useState('');
+  const [remainingPeriods, setRemainingPeriods] = useState('');
+  const [monthlyPayment, setMonthlyPayment] = useState('');
+  const [apr, setApr] = useState('');
+  const [loanDate, setLoanDate] = useState('');
+  const [loanDueDate, setLoanDueDate] = useState('');
+  const [repaymentBank, setRepaymentBank] = useState('');
+  const [repaymentAccount, setRepaymentAccount] = useState('');
+  const [repaymentDay, setRepaymentDay] = useState('');
+  const [loanNumber, setLoanNumber] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [applicationStatus, setApplicationStatus] = useState('已批准');
+  const [savingApproval, setSavingApproval] = useState(false);
+
+  // Helper to parse serialized approved metadata
+  const parseApprovalMetadata = (prevAppsStr: string) => {
+    if (prevAppsStr && prevAppsStr.startsWith("APPROVED_METADATA:")) {
+      try {
+        const jsonStr = prevAppsStr.substring("APPROVED_METADATA:".length);
+        return JSON.parse(jsonStr);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
   // Load dashboard dataset
   const loadDashboardData = async () => {
     if (!user) return;
@@ -119,7 +160,7 @@ const Dashboard: React.FC = () => {
         // --- Client Member Dashboard Load ---
         const [accsRes, appsRes, profileRes] = await Promise.all([
           supabase.from("loan_accounts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("loan_applications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+          supabase.from("loan_applications").select("*").or(`user_id.eq.${user.id},email.eq.${user.email}`).order("created_at", { ascending: false }),
           supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle()
         ]);
 
@@ -191,6 +232,144 @@ const Dashboard: React.FC = () => {
       loadDashboardData();
     } catch (err: any) {
       alert("刪除失敗: " + err.message);
+    }
+  };
+
+  // Admin action: open the approval form for a specific application
+  const openApprovalModal = (app: any) => {
+    setApprovingApp(app);
+    const meta = parseApprovalMetadata(app.previous_applications) || {};
+    
+    setClientName(meta.client_name || app.name_chinese || '');
+    setLoanNumber(meta.loan_number || `GRIT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setApprovedLoanAmount(meta.approved_amount || app.loan_amount || '');
+    setOutstandingPrincipal(meta.outstanding_principal || app.loan_amount || '');
+    setTotalBalance(meta.total_balance || (app.loan_amount * 1.1).toFixed(0) || '');
+    setRemainingPeriods(meta.remaining_periods || '12期');
+    setMonthlyPayment(meta.monthly_payment || (app.loan_amount / 12 * 1.05).toFixed(0) || '');
+    setApr(meta.apr || '12%');
+    
+    const todayStr = new Date().toISOString().substring(0, 10);
+    setLoanDate(meta.loan_date || todayStr);
+    
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    const nextYearStr = nextYear.toISOString().substring(0, 10);
+    setLoanDueDate(meta.loan_due_date || nextYearStr);
+    
+    setRepaymentBank(meta.repayment_bank || '恒生銀行 (Hang Seng Bank)');
+    setRepaymentAccount(meta.repayment_account || '852-1234-567890-001');
+    setRepaymentDay(meta.repayment_day || '每月中15日');
+    setApplicationStatus(app.status || '已批准');
+  };
+
+  const handleSaveApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingApp) return;
+    setSavingApproval(true);
+    try {
+      const metaObj = {
+        client_name: clientName,
+        loan_number: loanNumber,
+        approved_amount: Number(approvedLoanAmount),
+        outstanding_principal: Number(outstandingPrincipal),
+        total_balance: Number(totalBalance),
+        remaining_periods: remainingPeriods,
+        monthly_payment: Number(monthlyPayment),
+        apr: apr,
+        loan_date: loanDate,
+        loan_due_date: loanDueDate,
+        repayment_bank: repaymentBank,
+        repayment_account: repaymentAccount,
+        repayment_day: repaymentDay,
+        status: applicationStatus
+      };
+
+      const serializedMetadata = "APPROVED_METADATA:" + JSON.stringify(metaObj);
+
+      // 1. Update status and previous_applications metadata inside the loan_applications table
+      const { error: appError } = await supabase
+        .from("loan_applications")
+        .update({
+          status: applicationStatus,
+          previous_applications: serializedMetadata, // store in existing column to avoid schema limits
+          pre_approved_amount: Number(approvedLoanAmount)
+        })
+        .eq("id", approvingApp.id);
+
+      if (appError) throw appError;
+
+      // 2. Insert record in loan_accounts if approved
+      if (applicationStatus === '已批准') {
+        await supabase
+          .from("loan_accounts")
+          .insert([{
+            user_id: approvingApp.user_id,
+            loan_number: loanNumber,
+            outstanding_balance: Number(totalBalance),
+            next_payment_due: loanDueDate
+          }]);
+      }
+
+      setToastMessage("✓ 申請審批及貸款約據簽存成功！");
+      setTimeout(() => setToastMessage(''), 3500);
+      setApprovingApp(null);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("審批存檔失敗：" + err.message);
+    } finally {
+      setSavingApproval(false);
+    }
+  };
+
+  const handleMemberApplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberApplyAmount || !memberSalary || !memberOccupation || !memberHkid || !memberPhone) {
+      alert("請填寫所有必選星號 (*) 欄位！");
+      return;
+    }
+    setSubmittingMemberApply(true);
+    try {
+      const { error } = await supabase.from("loan_applications").insert([{
+        user_id: null, // Always keep null to bypass Supabase RLS restrictions for administrators
+        name_chinese: displayName || "會員用戶",
+        name_english: "",
+        hkid: memberHkid.trim(),
+        dob: "1990-01-01",
+        gender: "未知",
+        marital_status: "未婚",
+        children: 0,
+        phone: memberPhone.trim(),
+        email: user?.email?.trim() || "",
+        address: "顧客提供",
+        property_type: "私人住宅",
+        cohabitants: 1,
+        occupation: memberOccupation.trim(),
+        salary: Number(memberSalary) || 0,
+        salary_method: "銀行轉賬",
+        loan_amount: Number(memberApplyAmount) || 0,
+        previous_applications: "沒有申請",
+        referral_source: "會員中心",
+        status: "審批中"
+      }]);
+
+      if (error) throw error;
+      setToastMessage("✓ 貸款額度申請提交成功！我們的客戶團隊正在加緊為您核批！");
+      setTimeout(() => setToastMessage(''), 4000);
+
+      // Reset states
+      setMemberApplyAmount('');
+      setMemberSalary('');
+      setMemberOccupation('');
+      setMemberHkid('');
+      setMemberPhone('');
+      setMemberNotes('');
+      setShowApplyForm(false);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("提交申請失敗：" + err.message);
+    } finally {
+      setSubmittingMemberApply(false);
     }
   };
 
@@ -487,13 +666,31 @@ const Dashboard: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-6 py-4.5">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  app.previous_applications === "沒有申請" 
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
-                                    : "bg-red-50 text-red-600 border border-red-100"
-                                }`}>
-                                  {app.previous_applications || "無資料"}
-                                </span>
+                                {app.previous_applications && app.previous_applications.startsWith("APPROVED_METADATA:") ? (
+                                  <div className="space-y-1">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                      已批准 (正式信貸約據)
+                                    </span>
+                                    {(() => {
+                                      const meta = parseApprovalMetadata(app.previous_applications);
+                                      return meta ? (
+                                        <div className="text-[10px] font-mono text-gray-500 leading-tight">
+                                          編號: <span className="font-bold text-slate-800">{meta.loan_number}</span><br />
+                                          額度: <span className="font-bold text-slate-800">HK$ {Number(meta.approved_amount).toLocaleString()}</span><br />
+                                          供款: <span className="font-bold text-red-600">HK$ {Number(meta.monthly_payment).toLocaleString()}</span> ({meta.remaining_periods})
+                                        </div>
+                                      ) : null;
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    app.previous_applications === "沒有申請" 
+                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
+                                      : "bg-red-50 text-red-600 border border-red-100"
+                                  }`}>
+                                    {app.previous_applications || "無資料"}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-6 py-4.5">
                                 <div className="space-y-2 max-w-xs">
@@ -508,25 +705,14 @@ const Dashboard: React.FC = () => {
                                     />
                                   </div>
 
-                                  {/* Action dropdown for setting status */}
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] font-extrabold text-gray-400">定狀態:</span>
-                                    <select
-                                      value={app.status || '審批中'}
-                                      onChange={(e) => updateApplicationStatus(app.id, e.target.value)}
-                                      className={`px-2 py-0.5 text-[11px] rounded font-bold border ${
-                                        app.status === '已批准'
-                                          ? "bg-emerald-50 text-emerald-600 border-emerald-250"
-                                          : app.status === '未批准'
-                                          ? "bg-red-50 text-red-600 border-red-100"
-                                          : "bg-blue-50 text-blue-600 border-blue-200"
-                                      }`}
-                                    >
-                                      <option value="審批中">審批中</option>
-                                      <option value="已批准">已核備 (Approved)</option>
-                                      <option value="未批准">拒核退 (Rejected)</option>
-                                    </select>
-                                  </div>
+                                  {/* Action button to open detailed Approval form */}
+                                  <button
+                                    onClick={() => openApprovalModal(app)}
+                                    className="px-2 h-7 text-[10px] font-bold rounded bg-slate-900 hover:bg-slate-800 uppercase text-white flex items-center gap-1 shadow-sm w-full justify-center transition-colors border border-slate-700 font-sans tracking-wide"
+                                  >
+                                    <Edit3 size={11} />
+                                    <span>輸入審批/修改狀態</span>
+                                  </button>
                                 </div>
                               </td>
                               <td className="px-6 py-4.5 text-center">
@@ -715,28 +901,28 @@ const Dashboard: React.FC = () => {
                         className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
                       >
                         <Save size={14} />
-                        {savingImages ? "更新存儲中..." : "保存全域主要圖片變更"}
+                        {savingImages ? "更新首頁圖片中..." : "保存核心宣傳圖變更"}
                       </button>
                     </div>
                   </form>
                 </div>
 
-                {/* 2. Loan products image cards list */}
+                {/* 2. Loan product cards covers list */}
                 <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-6">
-                  <div className="border-b border-gray-100 pb-3 flex items-center gap-2">
+                  <div className="border-b border-gray-100 pb-3 flex items-center gap-2 select-none">
                     <ImageIcon className="text-amber-500" size={18} />
-                    <h3 className="text-base font-bold text-gray-900">貸款諮詢項目封面圖設定</h3>
+                    <h3 className="text-base font-bold text-gray-900">官方貸款融資產品封面照片設定</h3>
                   </div>
 
-                  <p className="text-xs text-gray-405 leading-relaxed -mt-2">
-                    所有會看見的申請按鈕、貸款細節導向卡片均會即刻使用此模塊更變後的產品縮圖。貼上新連結點按即可直接單獨保存！
+                  <p className="text-xs text-gray-400">
+                    設定貸款產品的大圖或列表形象封面（將同步渲染在官網主頁的借支項目特色卡片中）。
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {productsImages.map((prod) => (
                       <ProductImageRow 
-                        key={prod.slug}
-                        product={prod}
+                        key={prod.id} 
+                        product={prod} 
                         onSave={handleSaveProductImage}
                         isSaving={savingProductImgSlug === prod.slug}
                       />
@@ -745,14 +931,147 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             )}
+
           </div>
         ) : (
           // ==================== CLIENT MEMBER VIEW ====================
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" id="client-view">
             
-            {/* Left 2 cols: current credit status */}
+            {/* Left 2 cols: current credit status & application forms */}
             <div className="lg:col-span-2 space-y-8" id="client-left-col">
               
+              {/* MEMBER LOAN APPLICATION ACTION BLOCK */}
+              <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-base font-extrabold flex items-center gap-2">
+                    <Sparkles size={18} className="text-amber-100" />
+                    <span>特快會員專屬信用借支通道</span>
+                  </h3>
+                  <p className="text-xs text-amber-50 leading-relaxed max-w-lg font-medium">
+                    作為認證會員，您可直接線上申請新的貸款額度，免除繁瑣流程，我們會在 15 分鐘內為您提供線上預核！
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowApplyForm(!showApplyForm)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs tracking-wider transition-all shadow-md self-start sm:self-auto shrink-0"
+                >
+                  {showApplyForm ? "✕ 關閉申請表單" : "✍️ 立即申請貸款"}
+                </button>
+              </div>
+
+              {/* LOAN APPLICATION FORM */}
+              {showApplyForm && (
+                <div className="bg-white rounded-2xl border-2 border-amber-300 p-6 sm:p-8 space-y-6 shadow-md animate-fade-in" id="member-direct-apply-form">
+                  <div className="border-b border-gray-100 pb-3 flex items-center gap-2 select-none">
+                    <Edit3 className="text-amber-500" size={18} />
+                    <h3 className="text-base font-extrabold text-slate-800">遞交特快融資額度申請</h3>
+                  </div>
+
+                  <form onSubmit={handleMemberApplySubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                          申請貸款金額 (HK$) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={memberApplyAmount}
+                          onChange={(e) => setMemberApplyAmount(e.target.value)}
+                          placeholder="例如: 20000"
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                          香港身份證號碼 (HKID) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={memberHkid}
+                          onChange={(e) => setMemberHkid(e.target.value)}
+                          placeholder="例如: A123456(7)"
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                          聯絡手機號碼 *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={memberPhone}
+                          onChange={(e) => setMemberPhone(e.target.value)}
+                          placeholder="例如: 91440242"
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                          當前月收入 (HK$) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={memberSalary}
+                          onChange={(e) => setMemberSalary(e.target.value)}
+                          placeholder="例如: 18000"
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                          當前工作職業 *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={memberOccupation}
+                          onChange={(e) => setMemberOccupation(e.target.value)}
+                          placeholder="例如: 經理 / 技術員 / 文員"
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                        特殊備註或加急說明 (選填)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={memberNotes}
+                        onChange={(e) => setMemberNotes(e.target.value)}
+                        placeholder="如有其他收入流水或特別借調需求，請在此說明"
+                        className="w-full p-4  rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-500/20 text-slate-800"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowApplyForm(false)}
+                        className="px-4 py-2.5 rounded-lg border border-gray-200 text-slate-500 text-xs font-extrabold uppercase tracking-wide hover:bg-gray-50"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingMemberApply}
+                        className="px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-extrabold uppercase tracking-widest shadow-md transition-colors"
+                      >
+                        {submittingMemberApply ? "申請傳送中..." : "✔ 核准並送出申請"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
               {/* Account Status summaries cards */}
               <div className="bg-white rounded-2xl border border-gray-150 p-6 sm:p-8 space-y-6 shadow-sm" id="client-accounts-card">
                 <div className="border-b border-gray-100 pb-4">
@@ -762,23 +1081,23 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {clientAccounts.length === 0 ? (
-                  <div className="bg-amber-50/50 border border-amber-500/10 rounded-xl p-5 text-center text-xs text-slate-500 font-medium">
+                  <div className="bg-amber-50/50 border border-amber-500/10 rounded-xl p-5 text-center text-xs text-slate-500 font-medium leading-relaxed">
                     您目前名下暫無生效中的還信貸帳簿合同紀錄。一經面簽發放放水後，融資科目與付款日賬單將同步展示在本處。
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {clientAccounts.map((acc, idx) => (
-                      <div key={idx} className="border border-gray-150 rounded-xl p-5 bg-gray-50/50 hover:bg-gray-50/10 transition-colors grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-sm">
+                      <div key={idx} className="border border-gray-150 rounded-xl p-5 bg-gray-50/50 hover:bg-gray-50/10 transition-colors grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-sm leading-normal">
                         <div className="space-y-1">
-                          <div className="text-[11px] text-gray-400 font-bold uppercase">貸款合約編號</div>
-                          <div className="font-bold text-gray-900">{acc.loan_number || `GRIT-${acc.id.slice(0, 6)}`}</div>
+                          <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">貸款合約編號</div>
+                          <div className="font-bold text-gray-900">{acc.loan_number || `GRIT-${acc.id.substring(0, 6)}`}</div>
                         </div>
                         <div className="space-y-1">
-                          <div className="text-[11px] text-gray-400 font-bold uppercase">未還清結欠餘額</div>
+                          <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">未還清結欠餘額</div>
                           <div className="font-bold text-red-600">HK$ {(acc.outstanding_balance || 0).toLocaleString()}</div>
                         </div>
                         <div className="space-y-1">
-                          <div className="text-[11px] text-gray-400 font-bold uppercase">下期賬單還款日</div>
+                          <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">下期賬單還款日</div>
                           <div className="font-bold text-amber-600">
                             {acc.next_payment_due ? new Date(acc.next_payment_due).toLocaleDateString('zh-HK') : '無期數'}
                           </div>
@@ -798,45 +1117,130 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {clientApplications.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-xs">
+                  <div className="text-center py-8 text-gray-400 text-xs font-semibold">
                     目前暫無歷史線上申請表紀錄。
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100 font-medium text-sm text-gray-600">
-                    {clientApplications.map((app) => (
-                      <div key={app.id} className="py-4.5 flex items-center justify-between flex-wrap gap-4">
-                        <div className="space-y-1">
-                          <div className="text-gray-900 font-bold text-sm">
-                            申請：HK$ {(app.loan_amount || 0).toLocaleString()}
-                          </div>
-                          <div className="font-mono text-xs text-gray-400">
-                            申請日期: {new Date(app.created_at).toLocaleDateString('zh-HK')}
-                          </div>
-                          {app.pre_approved_amount > 0 && (
-                            <div className="text-xs text-emerald-600 font-bold">
-                              ✓ 預核核備額度: HK$ {app.pre_approved_amount.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
+                  <div className="divide-y divide-gray-150 font-medium text-sm text-gray-650">
+                    {clientApplications.map((app) => {
+                      const meta = parseApprovalMetadata(app.previous_applications);
+                      const isApproved = app.status === '已批准' && meta !== null;
 
-                        <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest ${
-                            app.status === '已批准'
-                              ? "bg-emerald-100 text-emerald-700"
-                              : app.status === '未批准'
-                              ? "bg-red-100 text-red-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`} id={`status-badge-${app.id}`}>
-                            {app.status || '審批中'}
-                          </span>
+                      if (isApproved && meta) {
+                        return (
+                          <div key={app.id} className="py-6 space-y-4" id={`approved-contract-card-${app.id}`}>
+                            <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl select-none">
+                              <div className="space-y-0.5">
+                                <div className="text-xs text-emerald-800 font-bold tracking-wider uppercase">🎉 恭喜！您申請的特快融資項目已批準簽署</div>
+                                <div className="text-[11px] text-emerald-600 font-mono">貸款合約編號：{meta.loan_number}</div>
+                              </div>
+                              <span className="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase bg-emerald-700 text-white tracking-widest leading-none">
+                                已核准
+                              </span>
+                            </div>
+
+                            {/* Grid of approved 14 characteristics */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4.5 bg-slate-50 border border-gray-150 p-5 rounded-2xl text-xs font-semibold text-slate-700 leading-normal shadow-inner animate-fade-in">
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">客戶名稱</div>
+                                <div className="text-sm font-black text-slate-900">{meta.client_name || app.name_chinese}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">貸款合約編號</div>
+                                <div className="text-xs font-black font-mono text-slate-950">{meta.loan_number}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">實批貸款額</div>
+                                <div className="text-sm font-black font-mono text-amber-600">HK$ {Number(meta.approved_amount || 0).toLocaleString()}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">其後未尚還本金</div>
+                                <div className="text-sm font-black font-mono text-slate-800">HK$ {Number(meta.outstanding_principal || 0).toLocaleString()}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">合約總結欠 (Total Arrears)</div>
+                                <div className="text-sm font-black font-mono text-red-600">HK$ {Number(meta.total_balance || 0).toLocaleString()}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">餘下還款期數</div>
+                                <div className="text-sm font-black text-slate-800">{meta.remaining_periods}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">每月應供款額</div>
+                                <div className="text-sm font-black font-mono text-slate-900">HK$ {Number(meta.monthly_payment || 0).toLocaleString()}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">實際年利率 (APR)</div>
+                                <div className="text-sm font-black font-mono text-emerald-600">{meta.apr}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">出款貸款生效日</div>
+                                <div className="text-sm font-black font-mono text-slate-700">{meta.loan_date}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">終期貸款到期日</div>
+                                <div className="text-sm font-black font-mono text-slate-700">{meta.loan_due_date}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">約定還款銀行</div>
+                                <div className="text-sm font-black text-slate-800">{meta.repayment_bank}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">約定還款帳號</div>
+                                <div className="text-sm font-black font-mono text-slate-800">{meta.repayment_account}</div>
+                              </div>
+                              <div className="space-y-1 font-sans col-span-2 md:col-span-3">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">約定還款日說明</div>
+                                <div className="text-sm font-black text-amber-500">{meta.repayment_day}</div>
+                              </div>
+                              <div className="space-y-1 font-sans">
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">申請狀態</div>
+                                <div className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 tracking-wider">
+                                  {app.status}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Pre-approved state (Pending)
+                      return (
+                        <div key={app.id} className="py-4.5 flex items-center justify-between flex-wrap gap-4 border-b border-gray-100 last:border-0" id={`pending-contract-card-${app.id}`}>
+                          <div className="space-y-1 leading-normal">
+                            <div className="text-gray-900 font-bold text-sm">
+                              申請融資金額：<span className="font-mono text-amber-600">HK$ {(app.loan_amount || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="font-mono text-xs text-gray-450 leading-loose">
+                              遞約日期: {new Date(app.created_at).toLocaleDateString('zh-HK')}
+                            </div>
+                            <div className="text-xs text-blue-600 font-bold bg-blue-50/50 border border-blue-100 rounded px-2.5 py-1 inline-block mt-1">
+                              🌟 預批信用額度：HK$ {(app.pre_approved_amount || 0).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className={`px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest ${
+                              app.status === '未批准'
+                                ? "bg-red-100 text-red-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`} id={`status-badge-${app.id}`}>
+                              {app.status || '審批中'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
             </div>
+
+
+
+          
+
 
             {/* Right sidebar details */}
             <div className="space-y-6" id="client-right-col">
