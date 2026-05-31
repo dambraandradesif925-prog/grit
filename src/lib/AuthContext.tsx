@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   async function checkAdminRole(userId: string, email?: string | null) {
-    if (email === 'chukrirookstooleu768@gmail.com') {
+    if (email && email.toLowerCase().trim() === 'chukrirookstooleu768@gmail.com') {
       setIsAdmin(true);
       return;
     }
@@ -65,14 +65,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   async function signIn(email: string, password: string) {
+    const cleanedEmail = email.toLowerCase().trim();
+    const cleanedPassword = password.trim();
     try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const credential = await signInWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
       return { error: null };
     } catch (err: any) {
       // Auto register first admin if not registerable or on first login
-      if (email === 'chukrirookstooleu768@gmail.com' && password === '123456') {
+      if (cleanedEmail === 'chukrirookstooleu768@gmail.com' && cleanedPassword === '123456') {
         try {
-          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          const cred = await createUserWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
           // Set role in firestore
           await setDoc(doc(db, 'user_roles', cred.user.uid), {
             user_id: cred.user.uid,

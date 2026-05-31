@@ -28,6 +28,9 @@ const Login: React.FC = () => {
     setLoading(true);
 
     let emailToUse = identifier.trim();
+    if (emailToUse.includes("@")) {
+      emailToUse = emailToUse.toLowerCase();
+    }
 
     try {
       // If the identifier is a loan number or phone (does not contain @), search Firestore
@@ -77,7 +80,8 @@ const Login: React.FC = () => {
           }, 1000);
           return;
         }
-        setErrorMsg("電郵 / 貸款編號或密碼錯誤，請重新核對。");
+        const errorDetail = error.code ? `[${error.code}] ${error.message}` : (error.message || String(error));
+        setErrorMsg(`電郵 / 貸款編號或密碼錯誤，請重新核對。（錯誤詳情: ${errorDetail}）`);
       } else {
         setSuccessMsg("✓ 歡迎登入富毅信貸！正在跳轉...");
         setTimeout(() => {
