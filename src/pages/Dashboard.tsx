@@ -17,7 +17,7 @@ import {
 import { 
   User, CheckCircle, Clock, AlertTriangle, Play, Save, 
   RefreshCw, KanbanSquare, Pencil, Sparkles, BookOpen, 
-  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign,
+  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign, X,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -92,6 +92,21 @@ const Dashboard: React.FC = () => {
   const [clientName, setClientName] = useState('');
   const [applicationStatus, setApplicationStatus] = useState('已批准');
   const [savingApproval, setSavingApproval] = useState(false);
+
+  // Manual Add Application states
+  const [showAddAppModal, setShowAddAppModal] = useState(false);
+  const [addAppName, setAddAppName] = useState('');
+  const [addAppGender, setAddAppGender] = useState('男');
+  const [addAppHkid, setAddAppHkid] = useState('');
+  const [addAppPhone, setAddAppPhone] = useState('');
+  const [addAppEmail, setAddAppEmail] = useState('');
+  const [addAppLoanAmount, setAddAppLoanAmount] = useState('');
+  const [addAppOccupation, setAddAppOccupation] = useState('');
+  const [addAppSalary, setAddAppSalary] = useState('');
+  const [addAppAddress, setAddAppAddress] = useState('');
+  const [addAppPropertyType, setAddAppPropertyType] = useState('私人住宅');
+  const [addAppPaymentMethod, setAddAppPaymentMethod] = useState('銀行自動轉賬');
+  const [savingNewApp, setSavingNewApp] = useState(false);
 
   // Helper to parse serialized approved metadata
   const parseApprovalMetadata = (prevAppsStr: string) => {
@@ -375,6 +390,60 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleCreateManualApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addAppName.trim() || !addAppPhone.trim() || !addAppLoanAmount.trim()) {
+      alert("請填寫最基本必備的客戶姓名、電話、申請金額！");
+      return;
+    }
+    setSavingNewApp(true);
+    try {
+      await addDoc(collection(db, "loan_applications"), {
+        user_id: null,
+        name_chinese: addAppName.trim(),
+        name_english: '',
+        hkid: addAppHkid.trim() || '未填寫',
+        dob: '1990-01-01',
+        gender: addAppGender,
+        marital_status: '未婚',
+        children: 0,
+        phone: addAppPhone.trim(),
+        email: addAppEmail.toLowerCase().trim() || `${addAppPhone.trim()}@temp-hk.com`,
+        address: addAppAddress.trim() || '由管理員代錄入',
+        property_type: addAppPropertyType,
+        cohabitants: 1,
+        occupation: addAppOccupation.trim() || '自由職業',
+        monthly_salary: Number(addAppSalary) || 0,
+        payment_method: addAppPaymentMethod,
+        loan_amount: Number(addAppLoanAmount) || 0,
+        previous_applications: '沒有申請',
+        referral_source: '管理員代辦',
+        status: '審批中',
+        created_at: new Date().toISOString()
+      });
+
+      setToastMessage("✓ 成功錄入新客戶資料與申請案件！");
+      setTimeout(() => setToastMessage(''), 3000);
+      
+      // Clean states
+      setAddAppName('');
+      setAddAppHkid('');
+      setAddAppPhone('');
+      setAddAppEmail('');
+      setAddAppLoanAmount('');
+      setAddAppOccupation('');
+      setAddAppSalary('');
+      setAddAppAddress('');
+      setShowAddAppModal(false);
+      
+      loadDashboardData();
+    } catch (err: any) {
+      alert("錄入客戶資料失敗: " + err.message);
+    } finally {
+      setSavingNewApp(false);
+    }
+  };
+
   const handleMemberApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberApplyAmount || !memberSalary || !memberOccupation || !memberHkid || !memberPhone) {
@@ -655,18 +724,28 @@ const Dashboard: React.FC = () => {
                     <span>線上特快申請名錄 (Applications Record)</span>
                   </h2>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-400">過濾狀態:</span>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white text-slate-700 focus:outline-none"
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setShowAddAppModal(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-750 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-sm transition-all border border-emerald-500 hover:border-emerald-600 active:scale-95"
+                      id="btn-add-client-manual"
                     >
-                      <option value="all">顯示全部</option>
-                      <option value="審批中">審批中</option>
-                      <option value="已批准">已核准</option>
-                      <option value="未批准">已拒绝</option>
-                    </select>
+                      <span>+ 手動錄入新客戶資料</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-400">過濾狀態:</span>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white text-slate-700 focus:outline-none"
+                      >
+                        <option value="all">顯示全部</option>
+                        <option value="審批中">審批中</option>
+                        <option value="已批准">已核准</option>
+                        <option value="未批准">已拒绝</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -1335,6 +1414,435 @@ const Dashboard: React.FC = () => {
         )}
 
       </div>
+
+      {/* 1. 審批貸款 & 合約詳情條款登錄 Modal */}
+      {approvingApp && (
+        <div className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto" style={{ contentVisibility: 'auto' }}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden my-8" id="approval-core-modal">
+            {/* Modal Title */}
+            <div className="bg-slate-950 px-6 py-4.5 flex items-center justify-between text-white border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Edit3 className="text-amber-500" size={18} />
+                <h3 className="font-extrabold text-sm tracking-wider">審批客戶信貸申請 & 約據條款詳細登錄</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApprovingApp(null)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                id="btn-close-approve-modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveApproval} className="p-6 space-y-5">
+              {/* Client Summary card */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/50 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs text-slate-700 leading-relaxed font-semibold">
+                <div>
+                  <span className="text-gray-400 font-bold block mb-0.5">客戶官方姓名</span>
+                  <p className="text-sm font-black text-slate-900">{approvingApp.name_chinese || '無 (手動指定)'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-bold block mb-0.5">客戶申報金額</span>
+                  <p className="text-sm font-black text-slate-900">HK$ {(approvingApp.loan_amount || 0).toLocaleString()}</p>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-bold block mb-0.5">HKID 身份證明 · 手機</span>
+                  <p className="text-slate-800">{approvingApp.hkid || '無'} · {approvingApp.phone || '無'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-bold block mb-0.5">申報工作月薪</span>
+                  <p className="text-slate-800">{(approvingApp.occupation || '自由職業')} · HK$ {(approvingApp.monthly_salary || 0).toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Status & Contract serial info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wide">
+                    決策審批狀態 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={applicationStatus}
+                    onChange={(e) => setApplicationStatus(e.target.value)}
+                    required
+                    className="w-full h-10 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 bg-white text-slate-800 font-bold font-sans"
+                  >
+                    <option value="審批中">🕒 審批中 (Pending Audit)</option>
+                    <option value="已批准">✓ 已批准 (Approved - Generate Contract)</option>
+                    <option value="被拒絕">✗ 被拒絕 (Rejected / Denied)</option>
+                    <option value="需要補件">⚠ 需要補件 (Pending Documents)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wide">
+                    核准信貸合約編號 (系統還款唯一鍵) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={loanNumber}
+                    onChange={(e) => setLoanNumber(e.target.value)}
+                    required
+                    placeholder="例如：GRIT-2026-9876"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 font-mono font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Specific terms panel - collapsible logically */}
+              <div className="border-t border-dashed border-gray-150 pt-4 space-y-4">
+                <div className="flex items-center gap-1.5 text-xs text-amber-600 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  <span>簽署約據核心信貸指標 & 還款銀行設定</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">合約姓名</label>
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">放款本金 (HKD)</label>
+                    <input
+                      type="number"
+                      value={approvedLoanAmount}
+                      onChange={(e) => setApprovedLoanAmount(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">未還本金 (HKD)</label>
+                    <input
+                      type="number"
+                      value={outstandingPrincipal}
+                      onChange={(e) => setOutstandingPrincipal(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-mono bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">總還款餘額 (HKD)</label>
+                    <input
+                      type="number"
+                      value={totalBalance}
+                      onChange={(e) => setTotalBalance(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">還款期數</label>
+                    <input
+                      type="text"
+                      value={remainingPeriods}
+                      onChange={(e) => setRemainingPeriods(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-bold bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">每期還款金額 (HKD)</label>
+                    <input
+                      type="number"
+                      value={monthlyPayment}
+                      onChange={(e) => setMonthlyPayment(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-mono bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">實際年利率 (APR)</label>
+                    <input
+                      type="text"
+                      value={apr}
+                      onChange={(e) => setApr(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">簽約放款日期</label>
+                    <input
+                      type="date"
+                      value={loanDate}
+                      onChange={(e) => setLoanDate(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">合約截止日期</label>
+                    <input
+                      type="date"
+                      value={loanDueDate}
+                      onChange={(e) => setLoanDueDate(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">約定還款銀行</label>
+                    <input
+                      type="text"
+                      value={repaymentBank}
+                      onChange={(e) => setRepaymentBank(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">官方指定專收帳戶</label>
+                    <input
+                      type="text"
+                      value={repaymentAccount}
+                      onChange={(e) => setRepaymentAccount(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1">約定還款日說明</label>
+                    <input
+                      type="text"
+                      value={repaymentDay}
+                      onChange={(e) => setRepaymentDay(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-xs text-slate-800 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit panel */}
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-5 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setApprovingApp(null)}
+                  className="px-4 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-600 text-xs font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingApproval}
+                  className="px-6 h-10 rounded-xl bg-slate-900 hover:bg-slate-850 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:bg-slate-300"
+                >
+                  <Save size={13} />
+                  {savingApproval ? "審批存檔中..." : "確認核定存檔 & 發布合約"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. 手動錄入新客戶資料 & 授信申請表登錄 Modal */}
+      {showAddAppModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-slate-100 overflow-hidden my-8" id="manual-add-app-modal">
+            {/* Modal Title */}
+            <div className="bg-emerald-950 px-6 py-4.5 flex items-center justify-between text-white border-b border-emerald-900">
+              <div className="flex items-center gap-2">
+                <User className="text-emerald-400" size={18} />
+                <h3 className="font-extrabold text-sm tracking-wider">為客戶手動錄入新的信貸申請件</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddAppModal(false)}
+                className="p-1 rounded-lg hover:bg-emerald-900 text-emerald-300 hover:text-white transition-colors"
+                id="btn-close-manual-add"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleCreateManualApplication} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    顧客中文姓名 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={addAppName}
+                    onChange={(e) => setAddAppName(e.target.value)}
+                    required
+                    placeholder="例如：陳大文"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 text-slate-800 bg-white font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    性別
+                  </label>
+                  <select
+                    value={addAppGender}
+                    onChange={(e) => setAddAppGender(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 text-slate-800 bg-white"
+                  >
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    HKID 身份證明號碼
+                  </label>
+                  <input
+                    type="text"
+                    value={addAppHkid}
+                    onChange={(e) => setAddAppHkid(e.target.value)}
+                    placeholder="例如：A123456(7)"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    顧客手提電話號碼 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={addAppPhone}
+                    onChange={(e) => setAddAppPhone(e.target.value)}
+                    required
+                    placeholder="例如：91234567"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    電郵地址 (登入帳號對應)
+                  </label>
+                  <input
+                    type="email"
+                    value={addAppEmail}
+                    onChange={(e) => setAddAppEmail(e.target.value)}
+                    placeholder="不填則自動按手機產生存根"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    申請額度金額 (HKD) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={addAppLoanAmount}
+                    onChange={(e) => setAddAppLoanAmount(e.target.value)}
+                    required
+                    placeholder="例如：50000"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    職業名稱
+                  </label>
+                  <input
+                    type="text"
+                    value={addAppOccupation}
+                    onChange={(e) => setAddAppOccupation(e.target.value)}
+                    placeholder="例如：文員 / 地盤經理"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    申報月收入 (HKD)
+                  </label>
+                  <input
+                    type="number"
+                    value={addAppSalary}
+                    onChange={(e) => setAddAppSalary(e.target.value)}
+                    placeholder="例如：22000"
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    居住物業類型
+                  </label>
+                  <select
+                    value={addAppPropertyType}
+                    onChange={(e) => setAddAppPropertyType(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white"
+                  >
+                    <option value="私人住宅">私人住宅</option>
+                    <option value="政府公屋">政府公屋</option>
+                    <option value="居屋">居屋</option>
+                    <option value="租用住宅">租用住宅</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-850 mb-1">
+                    常規薪酬發放方式
+                  </label>
+                  <select
+                    value={addAppPaymentMethod}
+                    onChange={(e) => setAddAppPaymentMethod(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white"
+                  >
+                    <option value="銀行自動轉賬">銀行自動轉賬</option>
+                    <option value="現金發放">現金發放</option>
+                    <option value="支票領取">支票領取</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-850 mb-1">
+                  通訊居住地址
+                </label>
+                <input
+                  type="text"
+                  value={addAppAddress}
+                  onChange={(e) => setAddAppAddress(e.target.value)}
+                  placeholder="居住地址 (街道/大廈/樓層)"
+                  className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs focus:ring-2 text-slate-800 bg-white"
+                />
+              </div>
+
+              {/* Submit panel */}
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-5 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAppModal(false)}
+                  className="px-4 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-600 text-xs font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingNewApp}
+                  className="px-6 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:bg-emerald-300"
+                >
+                  <Save size={13} />
+                  {savingNewApp ? "正在保存錄入..." : "錄入新案 & 重整名錄"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
