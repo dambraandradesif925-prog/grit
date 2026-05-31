@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { getCachedHero, fetchUpdatedImages } from '../lib/siteImages';
 import { 
   LoanProduct, 
@@ -42,31 +43,34 @@ const Home: React.FC = () => {
     fetchUpdatedImages(undefined, setHeroBg);
     
     // Fetch products
-    supabase
-      .from("loan_products")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
-        if (data && data.length > 0) setProducts(data);
-      });
+    getDocs(query(collection(db, "loan_products"), orderBy("sort_order", "asc")))
+      .then((snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as LoanProduct[];
+          setProducts(list);
+        }
+      })
+      .catch(err => console.error("Error fetching products:", err));
 
     // Fetch advantages
-    supabase
-      .from("advantages")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
-        if (data && data.length > 0) setAdvantages(data);
-      });
+    getDocs(query(collection(db, "advantages"), orderBy("sort_order", "asc")))
+      .then((snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Advantage[];
+          setAdvantages(list);
+        }
+      })
+      .catch(err => console.error("Error fetching advantages:", err));
 
     // Fetch FAQs
-    supabase
-      .from("faqs")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
-        if (data && data.length > 0) setFaqs(data);
-      });
+    getDocs(query(collection(db, "faqs"), orderBy("sort_order", "asc")))
+      .then((snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as FAQ[];
+          setFaqs(list);
+        }
+      })
+      .catch(err => console.error("Error fetching faqs:", err));
   }, []);
 
   // Compute estimate installment: e.g. 1.2% monthly flat rate (industry basic estimate)

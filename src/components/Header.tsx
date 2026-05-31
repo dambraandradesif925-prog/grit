@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, Menu, X, User as UserIcon, LogOut } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { LoanProduct } from '../types';
 
@@ -34,14 +35,16 @@ const Header: React.FC = () => {
   useEffect(() => {
     fetchUpdatedImages(setLogo);
     
-    supabase
-      .from("loan_products")
-      .select("slug, title")
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
-        if (data) {
-          setProducts(data);
-        }
+    getDocs(query(collection(db, "loan_products"), orderBy("sort_order", "asc")))
+      .then((snapshot) => {
+        const prodData = snapshot.docs.map(doc => ({
+          slug: doc.data().slug,
+          title: doc.data().title
+        })) as Pick<LoanProduct, 'slug' | 'title'>[];
+        setProducts(prodData);
+      })
+      .catch((err) => {
+        console.error("Error fetching header products:", err);
       });
   }, []);
 

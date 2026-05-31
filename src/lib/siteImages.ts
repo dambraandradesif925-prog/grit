@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 
 export const fallbackLogo = "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
 export const fallbackHero = "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
@@ -16,8 +17,9 @@ export async function fetchUpdatedImages(
   onHeroUpdate?: (url: string) => void
 ) {
   try {
-    const { data } = await supabase.from('site_settings').select('key, value');
-    if (data) {
+    const settingsSnap = await getDocs(collection(db, 'site_settings'));
+    if (!settingsSnap.empty) {
+      const data = settingsSnap.docs.map(doc => doc.data());
       const logo = data.find(s => s.key === 'logo_url')?.value;
       const hero = data.find(s => s.key === 'hero_background_url')?.value;
       

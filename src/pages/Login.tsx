@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { getCachedLogo, fetchUpdatedImages } from '../lib/siteImages';
 import { LogIn, Key, Mail, AlertTriangle, CheckCircle, Info } from 'lucide-react';
@@ -29,31 +30,38 @@ const Login: React.FC = () => {
     let emailToUse = identifier.trim();
 
     try {
-      // If the identifier is a loan number (does not contain @), we call the RPC function to get email
+      // If the identifier is a loan number or phone (does not contain @), search Firestore
       if (!emailToUse.includes("@")) {
-        const { data: resolvedEmail, error: rpcError } = await supabase.rpc("get_email_by_loan_number", {
-          _loan_number: emailToUse
-        });
+        console.log("Checking Firestore for phone match...");
+        // Check if there's a loan application with this phone number
+        const qPhone = query(collection(db, "loan_applications"), where("phone", "==", emailToUse), limit(1));
+        const snapPhone = await getDocs(qPhone);
 
-        if (rpcError || !resolvedEmail) {
-          console.warn("RPC fetch failed, checking local loan applications table directly...");
-          
-          // Direct fallback table query if RPC is not deployed in active environment
-          const { data: directApp } = await supabase
-            .from("loan_applications")
-            .select("email")
-            .eq("phone", emailToUse) // Let members login via phone if RPC not available
-            .maybeSingle();
+        if (!snapPhone.empty) {
+          emailToUse = snapPhone.docs[0].data().email;
+        } else {
+          console.log("Checking Firestore for loan number match...");
+          // Check if there's a loan account with this loan number
+          const qLoan = query(collection(db, "loan_accounts"), where("loan_number", "==", emailToUse), limit(1));
+          const snapLoan = await getDocs(qLoan);
 
-          if (directApp?.email) {
-            emailToUse = directApp.email;
+          if (!snapLoan.empty) {
+            const uid = snapLoan.docs[0].data().user_id;
+            // Lookup application with this user_id to find email
+            const qUid = query(collection(db, "loan_applications"), where("user_id", "==", uid), limit(1));
+            const snapUid = await getDocs(qUid);
+            if (!snapUid.empty) {
+              emailToUse = snapUid.docs[0].data().email;
+            } else {
+              setErrorMsg("找不到與此貸款編號或手機號碼對應的帳戶，請核對重試。");
+              setLoading(false);
+              return;
+            }
           } else {
-            setErrorMsg("找不到同此貸款編號或手機號碼對應的帳戶，請核對重試。");
+            setErrorMsg("找不到與此貸款編號或手機號碼對應的帳戶，請核對重試。");
             setLoading(false);
             return;
           }
-        } else {
-          emailToUse = resolvedEmail;
         }
       }
 

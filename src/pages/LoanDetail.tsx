@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { LoanProduct, fallbackProducts } from '../types';
 import { ArrowLeft, Send, CheckCircle, ShieldCheck, HelpCircle } from 'lucide-react';
 
@@ -16,14 +17,12 @@ const LoanDetail: React.FC = () => {
 
     const fetchLoan = async () => {
       try {
-        const { data, error } = await supabase
-          .from("loan_products")
-          .select("*")
-          .eq("slug", slug)
-          .maybeSingle();
+        const q = query(collection(db, "loan_products"), where("slug", "==", slug), limit(1));
+        const snap = await getDocs(q);
 
-        if (!error && data) {
-          setLoan(data);
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          setLoan({ id: doc.id, ...doc.data() } as LoanProduct);
         } else {
           const localMatch = fallbackProducts.find(p => p.slug === slug);
           setLoan(localMatch ?? null);

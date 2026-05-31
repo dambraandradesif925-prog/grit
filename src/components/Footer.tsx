@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, MessageCircle, MapPin, Shield, AlertTriangle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   defaultWhatsAppNumber, 
   defaultCompanyAddress, 
@@ -13,16 +14,14 @@ const Footer: React.FC = () => {
   const [whatsappNumber, setWhatsappNumber] = useState(defaultWhatsAppNumber);
 
   useEffect(() => {
-    supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "whatsapp_number")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          setWhatsappNumber(data.value);
-        }
-      });
+    const q = query(collection(db, "site_settings"), where("key", "==", "whatsapp_number"), limit(1));
+    getDocs(q).then((snap) => {
+      if (!snap.empty) {
+        setWhatsappNumber(snap.docs[0].data().value);
+      }
+    }).catch((err) => {
+      console.error("Error fetching whatsapp_number site_setting:", err);
+    });
   }, []);
 
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=你好，我想查詢貸款內容`;

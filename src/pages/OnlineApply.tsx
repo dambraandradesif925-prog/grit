@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { collection, query, where, getDocs, limit, addDoc, setDoc, doc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { db, auth, OperationType, handleFirestoreError } from '../lib/firebase';
 import { defaultThankYouMsg } from '../types';
 import { CheckCircle2, ShieldCheck, HelpCircle, Send, AlertCircle, FileText } from 'lucide-react';
 
@@ -34,15 +36,15 @@ const OnlineApply: React.FC = () => {
   const [thankYouMsg, setThankYouMsg] = useState(defaultThankYouMsg);
 
   useEffect(() => {
-    supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "registration_thank_you")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          setThankYouMsg(data.value);
+    const q = query(collection(db, "site_settings"), where("key", "==", "registration_thank_you"), limit(1));
+    getDocs(q)
+      .then((snapshot) => {
+        if (!snapshot.empty) {
+          setThankYouMsg(snapshot.docs[0].data().value);
         }
+      })
+      .catch((err) => {
+        console.error("Error loading registration thank you message:", err);
       });
   }, []);
 
@@ -66,68 +68,60 @@ const OnlineApply: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Create a member account in Supabase Authentication to enable fully-functional client dashboards
+      // 1. Create a member account in Firebase Authentication to enable fully-functional client dashboards
       let userId: string | null = null;
       if (formData.password.trim().length >= 6) {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email.trim(),
-          password: formData.password.trim(),
-          options: {
-            data: {
-              display_name: formData.nameChinese.trim()
-            }
-          }
-        });
-
-        if (signUpError) {
-          console.warn("SignUp Warning:", signUpError.message);
-          // If auth fails or user already exists, we will still record their application below
-        } else if (signUpData?.user) {
-          userId = signUpData.user.id;
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password.trim());
+          userId = cred.user.uid;
           
-          // Try inserting into profiles & roles tables
-          await supabase.from("profiles").insert({
+          // Set in Firestore profiles and roles
+          await setDoc(doc(db, "profiles", userId), {
             user_id: userId,
             display_name: formData.nameChinese.trim()
           });
 
-          await supabase.from("user_roles").insert({
+          await setDoc(doc(db, "user_roles", userId), {
             user_id: userId,
             role: "member"
           });
+        } catch (authErr: any) {
+          console.warn("SignUp Warning:", authErr.message);
+          // If auth fails or user already exists, we will still record their application below
         }
       }
 
       // 2. Insert the actual loan application record
-      const { error: insertError } = await supabase.from("loan_applications").insert([{
-        user_id: null, // Always keep as null to bypass Supabase Row Level Security restrictions for administrators
-        name_chinese: formData.nameChinese.trim(),
-        name_english: formData.nameEnglish.trim(),
-        hkid: formData.hkid.trim(),
-        dob: formData.dob,
-        gender: formData.gender,
-        marital_status: formData.maritalStatus,
-        children: Number(formData.children) || 0,
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
-        address: formData.address.trim(),
-        property_type: formData.propertyType,
-        cohabitants: Number(formData.cohabitants) || 1,
-        occupation: formData.occupation.trim(),
-        monthly_salary: Number(formData.salary) || 0,
-        payment_method: formData.salaryMethod,
-        loan_amount: Number(formData.loanAmount) || 0,
-        previous_applications: formData.previousApplications,
-        referral_source: formData.referralSource,
-        status: "審批中"
-      }]);
-
-      if (insertError) {
-        throw new Error(insertError.message || '表格提交失敗，請檢查資料重試。');
+      try {
+        await addDoc(collection(db, "loan_applications"), {
+          user_id: userId, // associate with generated user if password was supplied
+          name_chinese: formData.nameChinese.trim(),
+          name_english: formData.nameEnglish.trim(),
+          hkid: formData.hkid.trim(),
+          dob: formData.dob,
+          gender: formData.gender,
+          marital_status: formData.maritalStatus,
+          children: Number(formData.children) || 0,
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          address: formData.address.trim(),
+          property_type: formData.propertyType,
+          cohabitants: Number(formData.cohabitants) || 1,
+          occupation: formData.occupation.trim(),
+          monthly_salary: Number(formData.salary) || 0,
+          payment_method: formData.salaryMethod,
+          loan_amount: Number(formData.loanAmount) || 0,
+          previous_applications: formData.previousApplications,
+          referral_source: formData.referralSource,
+          status: "審批中",
+          created_at: new Date().toISOString()
+        });
+      } catch (insertError: any) {
+        handleFirestoreError(insertError, OperationType.CREATE, "loan_applications");
       }
 
       // Automatically sign out because the signup log will be auto-processed
-      await supabase.auth.signOut();
+      await firebaseSignOut(auth);
 
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "LoanApplication": {
+      "title": "Loan Application",
+      "description": "An online loan application submitted by a client or user",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "name_chinese": { "type": "string" },
+        "name_english": { "type": "string" },
+        "hkid": { "type": "string" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "marital_status": { "type": "string" },
+        "children": { "type": "number" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "property_type": { "type": "string" },
+        "cohabitants": { "type": "number" },
+        "occupation": { "type": "string" },
+        "monthly_salary": { "type": "number" },
+        "payment_method": { "type": "string" },
+        "loan_amount": { "type": "number" },
+        "previous_applications": { "type": "string" },
+        "referral_source": { "type": "string" },
+        "status": { "type": "string" },
+        "pre_approved_amount": { "type": "number" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["name_chinese", "phone", "email", "loan_amount", "status"]
+    },
+    "LoanAccount": {
+      "title": "Loan Account",
+      "description": "An active loan account generated after approval",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "loan_number": { "type": "string" },
+        "outstanding_balance": { "type": "number" },
+        "next_payment_due": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["user_id", "loan_number", "outstanding_balance"]
+    },
+    "SiteSetting": {
+      "title": "Site Setting",
+      "description": "Dynamic CMS settings and config variables for the website",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["key", "value"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "User profile with display name and other non-sensitive info",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "display_name": { "type": "string" }
+      },
+      "required": ["user_id", "display_name"]
+    },
+    "UserRole": {
+      "title": "User Role",
+      "description": "Role-bound permissions (e.g. admin or member) assigned to a user",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["user_id", "role"]
+    },
+    "LoanProduct": {
+      "title": "Loan Product",
+      "description": "Loan solutions shown in front sections and details pages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "image_url": { "type": "string" },
+        "sort_order": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["slug", "title"]
+    },
+    "Advantage": {
+      "title": "Advantage",
+      "description": "Value props and key features highlighted on the home page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "icon_name": { "type": "string" },
+        "sort_order": { "type": "number" }
+      },
+      "required": ["title", "description"]
+    },
+    "Faq": {
+      "title": "Faq",
+      "description": "Frequently Asked Questions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "sort_order": { "type": "number" }
+      },
+      "required": ["question", "answer"]
+    }
+  },
+  "firestore": {
+    "/loan_applications/{id}": {
+      "schema": "LoanApplication",
+      "description": "Collection of incoming loan applications from users"
+    },
+    "/loan_accounts/{id}": {
+      "schema": "LoanAccount",
+      "description": "Collection of generated approved active loans"
+    },
+    "/site_settings/{id}": {
+      "schema": "SiteSetting",
+      "description": "Collection of key-value parameters for site configuration"
+    },
+    "/profiles/{id}": {
+      "schema": "Profile",
+      "description": "Collection of user profiles containing display names"
+    },
+    "/user_roles/{id}": {
+      "schema": "UserRole",
+      "description": "Collection mapping the user IDs to their role (admin or member)"
+    },
+    "/loan_products/{id}": {
+      "schema": "LoanProduct",
+      "description": "Collection of loan solutions and plans"
+    },
+    "/advantages/{id}": {
+      "schema": "Advantage",
+      "description": "Collection of positive value offerings shown on the landing page"
+    },
+    "/faqs/{id}": {
+      "schema": "Faq",
+      "description": "Collection of frequently asked questions and answers"
+    }
+  }
+}

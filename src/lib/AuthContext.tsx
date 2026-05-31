@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from './supabase';
-import { User, Session } from '@supabase/supabase-js';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  session: any | null; // Kept for compatibility, can be the user object or null
   isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -22,78 +29,74 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  async function checkAdminRole(userId: string, email?: string) {
+  async function checkAdminRole(userId: string, email?: string | null) {
     if (email === 'chukrirookstooleu768@gmail.com') {
       setIsAdmin(true);
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      setIsAdmin(!!data);
+      const roleDocRef = doc(db, 'user_roles', userId);
+      const roleSnap = await getDoc(roleDocRef);
+      if (roleSnap.exists() && roleSnap.data().role === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
     } catch {
       setIsAdmin(false);
     }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        checkAdminRole(currentSession.user.id, currentSession.user.email);
-      }
-      setLoading(false);
-    }).catch(() => {
-      setSession(null);
-      setUser(null);
-      setIsAdmin(false);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        checkAdminRole(currentSession.user.id, currentSession.user.email);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await checkAdminRole(currentUser.uid, currentUser.email);
       } else {
         setIsAdmin(false);
       }
       setLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return unsubscribe;
   }, []);
 
   async function signIn(email: string, password: string) {
-    let { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error && email === 'chukrirookstooleu768@gmail.com' && password === '123456') {
-      const signUpRes = await supabase.auth.signUp({ email, password });
-      if (!signUpRes.error) {
-        const retry = await supabase.auth.signInWithPassword({ email, password });
-        error = retry.error;
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      return { error: null };
+    } catch (err: any) {
+      // Auto register first admin if not registerable or on first login
+      if (email === 'chukrirookstooleu768@gmail.com' && password === '123456') {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          // Set role in firestore
+          await setDoc(doc(db, 'user_roles', cred.user.uid), {
+            user_id: cred.user.uid,
+            role: 'admin'
+          });
+          await setDoc(doc(db, 'profiles', cred.user.uid), {
+            user_id: cred.user.uid,
+            display_name: 'Administrator'
+          });
+          return { error: null };
+        } catch (signUpErr: any) {
+          return { error: signUpErr };
+        }
       }
+      return { error: err };
     }
-    return { error };
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session: user, isAdmin, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

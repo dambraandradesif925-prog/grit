@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { 
+  collection, getDocs, getDoc, query, orderBy, where, limit, 
+  doc, setDoc, addDoc, updateDoc, deleteDoc 
+} from 'firebase/firestore';
+import { db, auth, OperationType, handleFirestoreError } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { 
   defaultWhatsAppNumber, 
@@ -110,45 +114,79 @@ const Dashboard: React.FC = () => {
     try {
       if (isAdmin) {
         // --- Admin Dashboard Load ---
-        const [appsRes, accsRes, profilesRes] = await Promise.all([
-          supabase.from("loan_applications").select("*").order("created_at", { ascending: false }),
-          supabase.from("loan_accounts").select("*").order("created_at", { ascending: false }),
-          supabase.from("profiles").select("*")
-        ]);
+        try {
+          const appsSnap = await getDocs(query(collection(db, "loan_applications")));
+          const accsSnap = await getDocs(query(collection(db, "loan_accounts")));
+          const profilesSnap = await getDocs(collection(db, "profiles"));
 
-        if (appsRes.data) setAdminApplications(appsRes.data);
-        if (accsRes.data) setAdminAccounts(accsRes.data);
-        if (profilesRes.data) setAdminUsers(profilesRes.data);
+          const appsList = appsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const accsList = accsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const profilesList = profilesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // Fetch current active site settings for editing
-        const { data: settingsData } = await supabase.from("site_settings").select("*");
-        if (settingsData) {
-          const w = settingsData.find(s => s.key === "whatsapp_number")?.value || defaultWhatsAppNumber;
-          const t = settingsData.find(s => s.key === "registration_thank_you")?.value || defaultThankYouMsg;
-          const l = settingsData.find(s => s.key === "license_number")?.value || defaultLicenseNumber;
-          const a = settingsData.find(s => s.key === "company_address")?.value || defaultCompanyAddress;
-          const h = settingsData.find(s => s.key === "complaint_hotline")?.value || defaultComplaintHotline;
-          
-          setSettingsForm({
-            whatsapp: w,
-            thankYouMsg: t,
-            license: l,
-            address: a,
-            hotline: h
+          // Client-side sort by created_at desc to avoid index requirements or missing field crashes
+          appsList.sort((a: any, b: any) => {
+            const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return tB - tA;
           });
 
-          // Logo & Hero Images
-          const logoVal = settingsData.find(s => s.key === "logo_url")?.value || "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
-          const heroVal = settingsData.find(s => s.key === "hero_background_url")?.value || "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
-          setLogoInput(logoVal);
-          setHeroInput(heroVal);
+          accsList.sort((a: any, b: any) => {
+            const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return tB - tA;
+          });
+
+          setAdminApplications(appsList);
+          setAdminAccounts(accsList);
+          setAdminUsers(profilesList);
+        } catch (dbErr) {
+          handleFirestoreError(dbErr, OperationType.LIST, "admin_load");
+        }
+
+        // Fetch current active site settings for editing
+        try {
+          const settingsSnap = await getDocs(collection(db, "site_settings"));
+          const settingsData = settingsSnap.docs.map(doc => doc.data());
+          if (settingsData && settingsData.length > 0) {
+            const w = settingsData.find(s => s.key === "whatsapp_number")?.value || defaultWhatsAppNumber;
+            const t = settingsData.find(s => s.key === "registration_thank_you")?.value || defaultThankYouMsg;
+            const l = settingsData.find(s => s.key === "license_number")?.value || defaultLicenseNumber;
+            const a = settingsData.find(s => s.key === "company_address")?.value || defaultCompanyAddress;
+            const h = settingsData.find(s => s.key === "complaint_hotline")?.value || defaultComplaintHotline;
+            
+            setSettingsForm({
+              whatsapp: w,
+              thankYouMsg: t,
+              license: l,
+              address: a,
+              hotline: h
+            });
+
+            // Logo & Hero Images
+            const logoVal = settingsData.find(s => s.key === "logo_url")?.value || "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+            const heroVal = settingsData.find(s => s.key === "hero_background_url")?.value || "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
+            setLogoInput(logoVal);
+            setHeroInput(heroVal);
+          }
+        } catch (dbErr) {
+          console.error("Error loading site settings in dashboard", dbErr);
         }
 
         // Fetch products
-        const { data: prodData } = await supabase.from("loan_products").select("id, slug, title, image_url").order("sort_order", { ascending: true });
-        if (prodData && prodData.length > 0) {
-          setProductsImages(prodData);
-        } else {
+        try {
+          const productsSnap = await getDocs(query(collection(db, "loan_products"), orderBy("sort_order", "asc")));
+          if (!productsSnap.empty) {
+            setProductsImages(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+          } else {
+            setProductsImages(fallbackProducts.map(p => ({
+              id: p.id,
+              slug: p.slug,
+              title: p.title,
+              image_url: p.image_url
+            })));
+          }
+        } catch (dbErr) {
+          console.error("Error loading products in dashboard", dbErr);
           setProductsImages(fallbackProducts.map(p => ({
             id: p.id,
             slug: p.slug,
@@ -158,17 +196,45 @@ const Dashboard: React.FC = () => {
         }
       } else {
         // --- Client Member Dashboard Load ---
-        const [accsRes, appsRes, profileRes] = await Promise.all([
-          supabase.from("loan_accounts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("loan_applications").select("*").or(`user_id.eq.${user.id},email.eq.${user.email}`).order("created_at", { ascending: false }),
-          supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle()
-        ]);
+        try {
+          const [accsRes, appsByUidRes, appsByEmailRes, profileRes] = await Promise.all([
+            getDocs(query(collection(db, "loan_accounts"), where("user_id", "==", user.uid))),
+            getDocs(query(collection(db, "loan_applications"), where("user_id", "==", user.uid))),
+            getDocs(query(collection(db, "loan_applications"), where("email", "==", user.email || ""))),
+            getDoc(doc(db, "profiles", user.uid))
+          ]);
 
-        setClientAccounts(accsRes.data ?? []);
-        setClientApplications(appsRes.data ?? []);
-        
-        const clientName = profileRes.data?.display_name || (appsRes.data && appsRes.data.length > 0 ? appsRes.data[0].name_chinese : "尊敬的會員");
-        setDisplayName(clientName);
+          const accsList = accsRes.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+          // Merge and deduplicate applications by document ID
+          const appsMap = new Map();
+          appsByUidRes.forEach(doc => appsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          appsByEmailRes.forEach(doc => appsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          
+          const appsList = Array.from(appsMap.values());
+
+          // Sort arrays client side desc
+          appsList.sort((a: any, b: any) => {
+            const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return tB - tA;
+          });
+
+          accsList.sort((a: any, b: any) => {
+            const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return tB - tA;
+          });
+
+          setClientAccounts(accsList);
+          setClientApplications(appsList);
+          
+          const profileData = profileRes.exists() ? profileRes.data() : null;
+          const clientName = profileData?.display_name || (appsList.length > 0 ? appsList[0].name_chinese : "尊敬的會員");
+          setDisplayName(clientName);
+        } catch (dbErr) {
+          handleFirestoreError(dbErr, OperationType.LIST, "client_load");
+        }
       }
     } catch (err) {
       console.error("Dashboard Loading Error:", err);
@@ -186,12 +252,7 @@ const Dashboard: React.FC = () => {
   // Admin action: updates registration application status
   const updateApplicationStatus = async (id: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({ status: newStatus })
-        .eq("id", id);
-
-      if (error) throw error;
+      await updateDoc(doc(db, "loan_applications", id), { status: newStatus });
       setToastMessage("✓ 申請狀態更新成功！");
       setTimeout(() => setToastMessage(''), 3000);
       loadDashboardData();
@@ -203,12 +264,7 @@ const Dashboard: React.FC = () => {
   // Admin action: change pre-approved credit amount
   const handleUpdateAmount = async (id: string, newAmount: number) => {
     try {
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({ pre_approved_amount: newAmount })
-        .eq("id", id);
-
-      if (error) throw error;
+      await updateDoc(doc(db, "loan_applications", id), { pre_approved_amount: newAmount });
       setToastMessage("✓ 預審信用額度更新成功！");
       setTimeout(() => setToastMessage(''), 3000);
       loadDashboardData();
@@ -221,12 +277,7 @@ const Dashboard: React.FC = () => {
   const handleDeleteApplication = async (id: string) => {
     if (!window.confirm("確認要永久刪除此客戶的貸款申請歷史紀錄嗎？此動作不可撤銷。")) return;
     try {
-      const { error } = await supabase
-        .from("loan_applications")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, "loan_applications", id));
       setToastMessage("✓ 紀錄已永久刪除！");
       setTimeout(() => setToastMessage(''), 3000);
       loadDashboardData();
@@ -288,27 +339,29 @@ const Dashboard: React.FC = () => {
       const serializedMetadata = "APPROVED_METADATA:" + JSON.stringify(metaObj);
 
       // 1. Update status and previous_applications metadata inside the loan_applications table
-      const { error: appError } = await supabase
-        .from("loan_applications")
-        .update({
+      try {
+        await updateDoc(doc(db, "loan_applications", approvingApp.id), {
           status: applicationStatus,
           previous_applications: serializedMetadata, // store in existing column to avoid schema limits
           pre_approved_amount: Number(approvedLoanAmount)
-        })
-        .eq("id", approvingApp.id);
-
-      if (appError) throw appError;
+        });
+      } catch (appError: any) {
+        throw new Error("更新申請狀態失敗: " + appError.message);
+      }
 
       // 2. Insert record in loan_accounts if approved
       if (applicationStatus === '已批准') {
-        await supabase
-          .from("loan_accounts")
-          .insert([{
-            user_id: approvingApp.user_id,
+        try {
+          await addDoc(collection(db, "loan_accounts"), {
+            user_id: approvingApp.user_id || null,
             loan_number: loanNumber,
             outstanding_balance: Number(totalBalance),
-            next_payment_due: loanDueDate
-          }]);
+            next_payment_due: loanDueDate,
+            created_at: new Date().toISOString()
+          });
+        } catch (accError: any) {
+          throw new Error("建立還款帳戶失敗: " + accError.message);
+        }
       }
 
       setToastMessage("✓ 申請審批及貸款約據簽存成功！");
@@ -330,30 +383,34 @@ const Dashboard: React.FC = () => {
     }
     setSubmittingMemberApply(true);
     try {
-      const { error } = await supabase.from("loan_applications").insert([{
-        user_id: null, // Always keep null to bypass Supabase RLS restrictions for administrators
-        name_chinese: displayName || "會員用戶",
-        name_english: "",
-        hkid: memberHkid.trim(),
-        dob: "1990-01-01",
-        gender: "未知",
-        marital_status: "未婚",
-        children: 0,
-        phone: memberPhone.trim(),
-        email: user?.email?.trim() || "",
-        address: "顧客提供",
-        property_type: "私人住宅",
-        cohabitants: 1,
-        occupation: memberOccupation.trim(),
-        monthly_salary: Number(memberSalary) || 0,
-        payment_method: "銀行轉賬",
-        loan_amount: Number(memberApplyAmount) || 0,
-        previous_applications: "沒有申請",
-        referral_source: "會員中心",
-        status: "審批中"
-      }]);
+      try {
+        await addDoc(collection(db, "loan_applications"), {
+          user_id: user?.uid || null, // Associate user ID in member portal
+          name_chinese: displayName || "會員用戶",
+          name_english: "",
+          hkid: memberHkid.trim(),
+          dob: "1990-01-01",
+          gender: "未知",
+          marital_status: "未婚",
+          children: 0,
+          phone: memberPhone.trim(),
+          email: user?.email?.trim() || "",
+          address: "顧客提供",
+          property_type: "私人住宅",
+          cohabitants: 1,
+          occupation: memberOccupation.trim(),
+          monthly_salary: Number(memberSalary) || 0,
+          payment_method: "銀行轉賬",
+          loan_amount: Number(memberApplyAmount) || 0,
+          previous_applications: "沒有申請",
+          referral_source: "會員中心",
+          status: "審批中",
+          created_at: new Date().toISOString()
+        });
+      } catch (insertError: any) {
+        handleFirestoreError(insertError, OperationType.CREATE, "loan_applications");
+      }
 
-      if (error) throw error;
       setToastMessage("✓ 貸款額度申請提交成功！我們的客戶團隊正在加緊為您核批！");
       setTimeout(() => setToastMessage(''), 4000);
 
@@ -387,12 +444,7 @@ const Dashboard: React.FC = () => {
       ];
 
       await Promise.all(operations.map(async (op) => {
-        const { data } = await supabase.from("site_settings").select("id").eq("key", op.key).maybeSingle();
-        if (data) {
-          await supabase.from("site_settings").update({ value: op.value }).eq("key", op.key);
-        } else {
-          await supabase.from("site_settings").insert({ key: op.key, value: op.value });
-        }
+        await setDoc(doc(db, "site_settings", op.key), { key: op.key, value: op.value });
       }));
 
       setToastMessage("✓ 網站全域參數儲存修改生效！");
@@ -416,12 +468,7 @@ const Dashboard: React.FC = () => {
       ];
 
       await Promise.all(operations.map(async (op) => {
-        const { data } = await supabase.from("site_settings").select("id").eq("key", op.key).maybeSingle();
-        if (data) {
-          await supabase.from("site_settings").update({ value: op.value }).eq("key", op.key);
-        } else {
-          await supabase.from("site_settings").insert({ key: op.key, value: op.value });
-        }
+        await setDoc(doc(db, "site_settings", op.key), { key: op.key, value: op.value });
       }));
 
       // Cache updated values locally so they reflect instantly
@@ -442,12 +489,21 @@ const Dashboard: React.FC = () => {
   const handleSaveProductImage = async (slug: string, newUrl: string) => {
     setSavingProductImgSlug(slug);
     try {
-      const { error } = await supabase
-        .from('loan_products')
-        .update({ image_url: newUrl })
-        .eq('slug', slug);
+      // Find the document for the product with this slug
+      const q = query(collection(db, "loan_products"), where("slug", "==", slug), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        await updateDoc(doc(db, "loan_products", snap.docs[0].id), { image_url: newUrl });
+      } else {
+        // Create document using slug as key
+        await setDoc(doc(db, "loan_products", slug), {
+          slug,
+          image_url: newUrl,
+          title: slug === 'personal' ? '個人信用貸款' : slug === 'owner' ? '業主特快私人貸款' : '中小企融資計劃',
+          sort_order: slug === 'personal' ? 1 : slug === 'owner' ? 2 : 3
+        });
+      }
 
-      if (error) throw error;
       setToastMessage("✓ 貸款產品封面圖片更新成功！");
       setTimeout(() => setToastMessage(''), 3000);
       loadDashboardData();

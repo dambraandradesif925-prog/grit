@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'chukrirookstooleu768@gmail.com' ||
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Loan Applications
+    match /loan_applications/{id} {
+      allow read: if isAdmin() || (isSignedIn() && existing().user_id == request.auth.uid) || (isSignedIn() && existing().email == request.auth.token.email);
+      allow create: if (
+        incoming().keys().hasAll(['name_chinese', 'phone', 'email', 'loan_amount', 'status']) &&
+        incoming().name_chinese is string && incoming().name_chinese.size() <= 200 &&
+        incoming().phone is string && incoming().phone.size() <= 50 &&
+        incoming().email is string && incoming().email.size() <= 100 &&
+        incoming().loan_amount is number && incoming().loan_amount >= 0 &&
+        incoming().status == '審批中' &&
+        (!incoming().keys().contains('user_id') || incoming().user_id == null || incoming().user_id is string)
+      );
+      allow update: if isAdmin() && (
+        incoming().status == '已批准' || incoming().status == '已拒絕' || incoming().status == '審批中'
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. Loan Accounts
+    match /loan_accounts/{id} {
+      allow read: if isAdmin() || (isSignedIn() && existing().user_id == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // 4. Site Settings
+    match /site_settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 5. Profiles
+    match /profiles/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (isSignedIn() && id == request.auth.uid && incoming().user_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // 6. User Roles
+    match /user_roles/{id} {
+      allow read: if isAdmin() || (isSignedIn() && id == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // 7. Loan Products
+    match /loan_products/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 8. Advantages
+    match /advantages/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 9. FAQs
+    match /faqs/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
