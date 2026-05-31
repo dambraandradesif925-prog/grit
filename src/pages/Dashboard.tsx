@@ -345,8 +345,8 @@ const Dashboard: React.FC = () => {
         property_type: "私人住宅",
         cohabitants: 1,
         occupation: memberOccupation.trim(),
-        salary: Number(memberSalary) || 0,
-        salary_method: "銀行轉賬",
+        monthly_salary: Number(memberSalary) || 0,
+        payment_method: "銀行轉賬",
         loan_amount: Number(memberApplyAmount) || 0,
         previous_applications: "沒有申請",
         referral_source: "會員中心",
@@ -661,7 +661,7 @@ const Dashboard: React.FC = () => {
                                 <div className="space-y-1">
                                   <div>職：{app.occupation}</div>
                                   <div className="font-mono text-amber-600">
-                                    薪：HK$ {(app.salary || 0).toLocaleString()} ({app.salary_method})
+                                    薪：HK$ {(app.monthly_salary || app.salary || 0).toLocaleString()} ({app.payment_method || app.salary_method || '未知'})
                                   </div>
                                 </div>
                               </td>
