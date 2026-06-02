@@ -108,6 +108,26 @@ const Dashboard: React.FC = () => {
   const [addAppPaymentMethod, setAddAppPaymentMethod] = useState('銀行自動轉賬');
   const [savingNewApp, setSavingNewApp] = useState(false);
 
+  // User Profile and transaction modal states
+  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [adminTransactions, setAdminTransactions] = useState<any[]>([]);
+  const [showRepayModal, setShowRepayModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [repayFps, setRepayFps] = useState('');
+  const [repayAmount, setRepayAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [submittingTx, setSubmittingTx] = useState(false);
+
+  // Admin Profile Edit states
+  const [editingProfile, setEditingProfile] = useState<any | null>(null);
+  const [editProfileName, setEditProfileName] = useState('');
+  const [editProfileBalance, setEditProfileBalance] = useState('');
+  const [editProfileBankName, setEditProfileBankName] = useState('');
+  const [editProfileBankNumber, setEditProfileBankNumber] = useState('');
+  const [editProfilePhone, setEditProfilePhone] = useState('');
+  const [editProfileEmail, setEditProfileEmail] = useState('');
+  const [savingProfileEdit, setSavingProfileEdit] = useState(false);
+
   // Helper to parse serialized approved metadata
   const parseApprovalMetadata = (prevAppsStr: string) => {
     if (prevAppsStr && prevAppsStr.startsWith("APPROVED_METADATA:")) {
@@ -133,10 +153,12 @@ const Dashboard: React.FC = () => {
           const appsSnap = await getDocs(query(collection(db, "loan_applications")));
           const accsSnap = await getDocs(query(collection(db, "loan_accounts")));
           const profilesSnap = await getDocs(collection(db, "profiles"));
+          const txsSnap = await getDocs(collection(db, "transactions"));
 
           const appsList = appsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           const accsList = accsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           const profilesList = profilesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const txsList = txsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
           // Client-side sort by created_at desc to avoid index requirements or missing field crashes
           appsList.sort((a: any, b: any) => {
@@ -151,9 +173,16 @@ const Dashboard: React.FC = () => {
             return tB - tA;
           });
 
+          txsList.sort((a: any, b: any) => {
+            const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return tB - tA;
+          });
+
           setAdminApplications(appsList);
           setAdminAccounts(accsList);
           setAdminUsers(profilesList);
+          setAdminTransactions(txsList);
         } catch (dbErr) {
           handleFirestoreError(dbErr, OperationType.LIST, "admin_load");
         }
@@ -247,6 +276,17 @@ const Dashboard: React.FC = () => {
           const profileData = profileRes.exists() ? profileRes.data() : null;
           const clientName = profileData?.display_name || (appsList.length > 0 ? appsList[0].name_chinese : "尊敬的會員");
           setDisplayName(clientName);
+          
+          if (profileData) {
+            setUserProfile(profileData);
+          } else {
+            setUserProfile({
+              display_name: clientName,
+              balance: "0",
+              bank_name: "未設定",
+              bank_number: "未設定"
+            });
+          }
         } catch (dbErr) {
           handleFirestoreError(dbErr, OperationType.LIST, "client_load");
         }
@@ -499,6 +539,119 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // User submissions: Buyout / Repay / Withdraw
+  const handleSubmitRepay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repayFps.trim() || !repayAmount.trim()) {
+      alert("請填寫所有欄位！");
+      return;
+    }
+    setSubmittingTx(true);
+    try {
+      await addDoc(collection(db, "transactions"), {
+        user_id: user?.uid || null,
+        client_name: userProfile?.display_name || displayName,
+        type: "還款",
+        fps_account: repayFps.trim(),
+        amount: Number(repayAmount),
+        status: "處理中",
+        created_at: new Date().toISOString()
+      });
+
+      setToastMessage("✓ 還款申請提交成功！我們將盡快查實入款。");
+      setTimeout(() => setToastMessage(''), 3500);
+      setRepayFps('');
+      setRepayAmount('');
+      setShowRepayModal(false);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("提交還款失敗: " + err.message);
+    } finally {
+      setSubmittingTx(false);
+    }
+  };
+
+  const handleSubmitWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawAmount.trim()) {
+      alert("請輸入提款金額！");
+      return;
+    }
+    setSubmittingTx(true);
+    try {
+      await addDoc(collection(db, "transactions"), {
+        user_id: user?.uid || null,
+        client_name: userProfile?.display_name || displayName,
+        type: "提款",
+        bank_name: userProfile?.bank_name || "未設定",
+        bank_number: userProfile?.bank_number || "未設定",
+        amount: Number(withdrawAmount),
+        status: "處理中",
+        created_at: new Date().toISOString()
+      });
+
+      setToastMessage("✓ 提款申請提交成功！核數後將會手續特快放款至您指定的戶口。");
+      setTimeout(() => setToastMessage(''), 3500);
+      setWithdrawAmount('');
+      setShowWithdrawModal(false);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("提交提款失敗: " + err.message);
+    } finally {
+      setSubmittingTx(false);
+    }
+  };
+
+  const handleSaveProfileEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+    setSavingProfileEdit(true);
+    try {
+      await setDoc(doc(db, "profiles", editingProfile.id), {
+        user_id: editingProfile.id,
+        display_name: editProfileName.trim(),
+        balance: editProfileBalance.trim() || '0',
+        bank_name: editProfileBankName.trim() || '未設定',
+        bank_number: editProfileBankNumber.trim() || '未設定',
+        phone: editProfilePhone.trim(),
+        email: editProfileEmail.trim(),
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
+      setToastMessage("✓ 客戶授信額度與餘額設定保存成功！");
+      setTimeout(() => setToastMessage(''), 3500);
+      setEditingProfile(null);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("更新失敗: " + err.message);
+    } finally {
+      setSavingProfileEdit(false);
+    }
+  };
+
+  const handleMarkTxProcessed = async (txId: string) => {
+    try {
+      await updateDoc(doc(db, "transactions", txId), {
+        status: "已處理"
+      });
+      setToastMessage("✓ 已標記申請為已完成處理。");
+      setTimeout(() => setToastMessage(''), 3000);
+      loadDashboardData();
+    } catch (err: any) {
+      alert("更新狀態失敗: " + err.message);
+    }
+  };
+
+  const handleOpenEditProfile = (profile: any) => {
+    setEditingProfile(profile);
+    setEditProfileName(profile.display_name || '');
+    setEditProfileBalance(profile.balance || '0');
+    setEditProfileBankName(profile.bank_name || '未設定');
+    setEditProfileBankNumber(profile.bank_number || '未設定');
+    setEditProfilePhone(profile.phone || '');
+    setEditProfileEmail(profile.email || '');
+  };
+
   // Admin action: save updated settings in tables
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -599,6 +752,9 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  const repaymentTxs = adminTransactions.filter((tx) => tx.type === "還款");
+  const withdrawalTxs = adminTransactions.filter((tx) => tx.type === "提款");
+
   return (
     <div className="bg-gray-50 min-h-screen py-8 text-slate-800" id="main-dashboard-portal">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -681,7 +837,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Admin Tabs */}
-            <div className="flex gap-2 border-b border-gray-200 pb-px" id="admin-tabs">
+            <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-px" id="admin-tabs">
               <button
                 onClick={() => setTab('applications')}
                 className={`px-4 py-2.5 text-xs font-extrabold tracking-wider uppercase border-b-2 transition-all ${
@@ -691,6 +847,17 @@ const Dashboard: React.FC = () => {
                 }`}
               >
                 線上申請件核定 ({adminApplications.length})
+              </button>
+              <button
+                onClick={() => setTab('accounts')}
+                className={`px-4 py-2.5 text-xs font-extrabold tracking-wider uppercase border-b-2 transition-all ${
+                  tab === 'accounts' 
+                    ? "border-amber-500 text-amber-500" 
+                    : "border-transparent text-gray-400 hover:text-gray-700"
+                }`}
+                id="tab-btn-accounts"
+              >
+                客戶餘額與帳戶設定 ({adminUsers.length})
               </button>
               <button
                 onClick={() => setTab('settings')}
@@ -868,6 +1035,225 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             )}
+
+            {tab === 'accounts' && (
+              <div className="space-y-8 animate-fade-in" id="panel-accounts-admin">
+                  {/* 1a. Repayment Transactions Table */}
+                  <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-4" id="admin-repayments-panel">
+                    <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="text-teal-600" size={20} />
+                        <h3 className="text-base font-bold text-gray-900 font-sans">客戶還款記錄清單 (Repayments Register)</h3>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
+                        總計 {repaymentTxs.length} 筆
+                      </span>
+                    </div>
+
+                    {repaymentTxs.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                        暫無最新客戶還款紀錄。
+                      </div>
+                    ) : (
+                      <div className="relative overflow-x-auto rounded-xl border border-gray-150">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 font-bold uppercase tracking-wider">
+                              <th className="px-5 py-3">還款金額</th>
+                              <th className="px-5 py-3">日期</th>
+                              <th className="px-5 py-3">時間</th>
+                              <th className="px-5 py-3">客戶名稱</th>
+                              <th className="px-5 py-3">客戶還款付款資訊 (FPS ID / 手機號碼)</th>
+                              <th className="px-5 py-3 text-center">狀態</th>
+                              <th className="px-5 py-3 text-center">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-150 text-slate-700 font-medium">
+                            {repaymentTxs.map((tx) => {
+                              const txDate = tx.created_at ? new Date(tx.created_at) : null;
+                              const dStr = txDate ? txDate.toLocaleDateString('zh-HK') : '---';
+                              const tStr = txDate ? txDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---';
+                              return (
+                                <tr key={tx.id} className="hover:bg-slate-50/50">
+                                  <td className="px-5 py-3.5 font-extrabold text-teal-600 text-sm font-mono">
+                                    HK$ {Number(tx.amount).toLocaleString()}
+                                  </td>
+                                  <td className="px-5 py-3.5 font-mono">{dStr}</td>
+                                  <td className="px-5 py-3.5 font-mono">{tStr}</td>
+                                  <td className="px-5 py-3.5 font-bold text-slate-900">{tx.client_name}</td>
+                                  <td className="px-5 py-3.5 font-mono text-slate-600">
+                                    <span className="bg-teal-50 px-2 py-0.5 rounded text-[10px] border border-teal-100">{tx.fps_account || "---"}</span>
+                                  </td>
+                                  <td className="px-5 py-3.5 text-center">
+                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      tx.status === "已處理"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-amber-100 text-amber-800 animate-pulse"
+                                    }`}>
+                                      {tx.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3.5 text-center">
+                                    {tx.status === "處理中" ? (
+                                      <button
+                                        onClick={() => handleMarkTxProcessed(tx.id)}
+                                        className="px-2.5 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors shadow-sm"
+                                      >
+                                        ✔ 標記為內部已入數
+                                      </button>
+                                    ) : (
+                                      <span className="text-[11px] text-gray-400 font-mono">已核對完成</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 1b. Withdrawal Transactions Table */}
+                  <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-4" id="admin-withdrawals-panel">
+                    <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="text-amber-500" size={20} />
+                        <h3 className="text-base font-bold text-gray-900 font-sans">客戶提款登記清單 (Withdrawals Register)</h3>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+                        總計 {withdrawalTxs.length} 筆
+                      </span>
+                    </div>
+
+                    {withdrawalTxs.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                        暫無最新客戶提款紀錄。
+                      </div>
+                    ) : (
+                      <div className="relative overflow-x-auto rounded-xl border border-gray-150">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 font-bold uppercase tracking-wider">
+                              <th className="px-5 py-3">提款金額</th>
+                              <th className="px-5 py-3">日期</th>
+                              <th className="px-5 py-3">時間</th>
+                              <th className="px-5 py-3">客戶名稱</th>
+                              <th className="px-5 py-3">提款指定銀行預設戶口</th>
+                              <th className="px-5 py-3 text-center">狀態</th>
+                              <th className="px-5 py-3 text-center">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-150 text-slate-700 font-medium">
+                            {withdrawalTxs.map((tx) => {
+                              const txDate = tx.created_at ? new Date(tx.created_at) : null;
+                              const dStr = txDate ? txDate.toLocaleDateString('zh-HK') : '---';
+                              const tStr = txDate ? txDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---';
+                              return (
+                                <tr key={tx.id} className="hover:bg-slate-50/50">
+                                  <td className="px-5 py-3.5 font-extrabold text-amber-600 text-sm font-mono">
+                                    HK$ {Number(tx.amount).toLocaleString()}
+                                  </td>
+                                  <td className="px-5 py-3.5 font-mono">{dStr}</td>
+                                  <td className="px-5 py-3.5 font-mono">{tStr}</td>
+                                  <td className="px-5 py-3.5 font-bold text-slate-900">{tx.client_name}</td>
+                                  <td className="px-5 py-3.5">
+                                    <div className="font-semibold text-slate-800">{tx.bank_name || "---"}</div>
+                                    <div className="text-[10px] text-gray-400 font-mono">{tx.bank_number || ""}</div>
+                                  </td>
+                                  <td className="px-5 py-3.5 text-center">
+                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      tx.status === "已處理"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-amber-100 text-amber-800 animate-pulse"
+                                    }`}>
+                                      {tx.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3.5 text-center">
+                                    {tx.status === "處理中" ? (
+                                      <button
+                                        onClick={() => handleMarkTxProcessed(tx.id)}
+                                        className="px-2.5 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors shadow-sm"
+                                      >
+                                        ✔ 標記為特快已放款
+                                      </button>
+                                    ) : (
+                                      <span className="text-[11px] text-gray-400 font-mono">已放清/已完成</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Client Profile Balance & Accounts Master details list */}
+                  <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-4" id="admin-users-balances-panel">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <User size={20} className="text-amber-500" />
+                        <h3 className="text-base font-bold text-gray-900 font-sans">註冊會員戶口與可用餘額 (Member Accounts & Credit Balances)</h3>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      管理全網站已註冊會員的 **可用餘額 (餘額)** 、預設收款和還款銀行賬戶資料。可用餘額可由管理人員在下方任意編輯、增刪或授信修改。
+                    </p>
+
+                    <div className="relative overflow-x-auto rounded-xl border border-gray-150">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-gray-150 text-slate-500 font-bold uppercase tracking-wider">
+                            <th className="px-5 py-3">會員姓名</th>
+                            <th className="px-5 py-3">聯絡電話/電郵</th>
+                            <th className="px-5 py-3">當前餘額 (可任意修改)</th>
+                            <th className="px-5 py-3">預設收款銀行 (提款預設)</th>
+                            <th className="px-5 py-3 border-r border-gray-100">銀行戶口號碼</th>
+                            <th className="px-5 py-3 text-center">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-150 text-slate-700 font-medium">
+                          {adminUsers.map((profile) => (
+                            <tr key={profile.id} className="hover:bg-slate-50/50">
+                              <td className="px-5 py-3.5 font-bold text-slate-900 text-sm">
+                                {profile.display_name || "未設定"}
+                              </td>
+                              <td className="px-5 py-3.5 text-slate-600 space-y-0.5">
+                                {profile.phone && <div className="font-mono">📞 {profile.phone}</div>}
+                                {profile.email && <div className="font-mono text-gray-400">{profile.email}</div>}
+                                {!profile.phone && !profile.email && <span className="text-gray-400">---</span>}
+                              </td>
+                              <td className="px-5 py-3.5 text-slate-900 font-extrabold text-sm font-mono text-amber-600">
+                                HK$ {profile.balance || "0"}
+                              </td>
+                              <td className="px-5 py-3.5">
+                                {profile.bank_name || "未設定"}
+                              </td>
+                              <td className="px-5 py-3.5 font-mono border-r border-gray-100">
+                                {profile.bank_number || "未設定"}
+                              </td>
+                              <td className="px-5 py-3.5 text-center">
+                                <button
+                                  onClick={() => handleOpenEditProfile(profile)}
+                                  className="px-3 py-1 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded flex items-center gap-1 mx-auto transition-colors"
+                                >
+                                  <Pencil size={11} />
+                                  <span>編輯餘額及帳戶</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
 
             {/* Tab: Config Settings Page */}
             {tab === 'settings' && (
@@ -1075,6 +1461,53 @@ const Dashboard: React.FC = () => {
             {/* Left 2 cols: current credit status & application forms */}
             <div className="lg:col-span-2 space-y-8" id="client-left-col">
               
+              {/* MEMBER PROFILE BALANCE & ACTIONS CARD */}
+              <div className="bg-white rounded-2xl border border-gray-150 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in" id="client-balance-card">
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-slate-400 text-left uppercase tracking-widest font-sans flex items-center gap-1.5">
+                    <DollarSign size={15} className="text-amber-500 animate-pulse shrink-0" />
+                    <span>戶口可用餘額 (Account Credit Balance)</span>
+                  </div>
+                  <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono tracking-tight flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-slate-400 mr-0.5">HK$</span>
+                    {userProfile?.balance || "0"}
+                  </div>
+                  {userProfile?.bank_name && userProfile?.bank_name !== "未設定" && (
+                     <div className="text-xs text-gray-400 flex items-center gap-1.5 font-sans mt-2 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-lg w-fit">
+                       <span>預設收款：</span>
+                       <span className="font-semibold text-slate-600">{userProfile.bank_name}</span>
+                       <span className="font-mono bg-slate-200/50 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">{userProfile.bank_number}</span>
+                     </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 w-full md:w-auto shrink-0" id="client-actions-buttons">
+                  <button
+                    onClick={() => {
+                      setRepayFps('');
+                      setRepayAmount('');
+                      setShowRepayModal(true);
+                    }}
+                    type="button"
+                    className="flex-1 md:flex-none inline-flex items-center justify-center px-5 h-12 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-750 text-white font-extrabold text-xs tracking-wider transition-all shadow-sm active:scale-95"
+                    id="btn-repay-trigger"
+                  >
+                    🤝 立即還款 (Repay)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setWithdrawAmount('');
+                      setShowWithdrawModal(true);
+                    }}
+                    type="button"
+                    className="flex-1 md:flex-none inline-flex items-center justify-center px-5 h-12 rounded-xl bg-amber-500 hover:bg-amber-600 border border-amber-400 text-white font-extrabold text-xs tracking-wider transition-all shadow-sm active:scale-95 text-center"
+                    id="btn-withdraw-trigger"
+                  >
+                    💰 提款申請 (Withdraw)
+                  </button>
+                </div>
+              </div>
+
               {/* MEMBER LOAN APPLICATION ACTION BLOCK */}
               <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="space-y-1">
@@ -1837,6 +2270,277 @@ const Dashboard: React.FC = () => {
                 >
                   <Save size={13} />
                   {savingNewApp ? "正在保存錄入..." : "錄入新案 & 重整名錄"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Repayment Modal (還款) */}
+      {showRepayModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="modal-repay-wrapper">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-gray-150 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-1.5 font-sans">
+                <span>🤝 特快線上還款登記 (Repayment Portal)</span>
+              </h3>
+              <button 
+                onClick={() => setShowRepayModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                id="btn-close-repay"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRepay} className="space-y-5" id="form-repay">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-750 uppercase tracking-wider text-left">
+                  我們的收款轉數快帳戶 (FPS Account):
+                </label>
+                <div className="bg-amber-500/10 text-amber-900 px-4 py-3 rounded-xl border border-amber-500/20 text-xs font-extrabold font-mono tracking-wider flex items-center justify-between">
+                  <span>FPS ID: 96396851</span>
+                  <span className="bg-amber-500 text-white font-sans text-[10px] px-2 py-0.5 rounded uppercase">收款專用</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-750 uppercase tracking-wider text-left">
+                  請填寫您轉賬的客人在用 FPS 帳戶 / 付款流水號:
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="請輸入您的 FPS 付款帳戶號碼或登記電話"
+                  value={repayFps}
+                  onChange={(e) => setRepayFps(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl border border-gray-255 text-sm focus:ring-2 text-slate-800 bg-white"
+                  id="repay-fps-input"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-750 uppercase tracking-wider text-left">
+                  還款金額 (HK$):
+                </label>
+                <input 
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="請輸入您本次還款的實際金額"
+                  value={repayAmount}
+                  onChange={(e) => setRepayAmount(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl border border-gray-255 text-sm focus:ring-2 text-slate-800 bg-white"
+                  id="repay-amount-input"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowRepayModal(false)}
+                  className="px-4 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-600 text-xs font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingTx}
+                  className="px-6 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:bg-gray-400"
+                >
+                  {submittingTx ? "提交核對中..." : "確認遞交還款"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Withdrawal Modal (提款) */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="modal-withdraw-wrapper">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-gray-150 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-1.5 font-sans">
+                <span>💰 特快提款放款申請 (Withdrawal Portal)</span>
+              </h3>
+              <button 
+                onClick={() => setShowWithdrawModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                id="btn-close-withdraw"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitWithdraw} className="space-y-4" id="form-withdraw">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest text-left">
+                  客人姓名 (預設個人資料)
+                </label>
+                <div className="w-full h-11 px-4 rounded-xl border border-gray-150 bg-gray-50 flex items-center text-sm font-bold text-slate-705">
+                  {userProfile?.display_name || displayName}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest text-left">
+                  預設銀行名稱 (預設個人資料)
+                </label>
+                <div className="w-full h-11 px-4 rounded-xl border border-gray-150 bg-gray-50 flex items-center text-sm font-bold text-slate-705">
+                  {userProfile?.bank_name || "未設定 (請聯繫客服編輯預設收款行)"}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest text-left">
+                  預設銀行號碼 (預設個人資料)
+                </label>
+                <div className="w-full h-11 px-4 rounded-xl border border-gray-150 bg-gray-50 flex items-center text-sm font-bold text-slate-705 font-mono">
+                  {userProfile?.bank_number || "未設定 (請聯繫客服編輯預設收款號)"}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-755 uppercase tracking-wider text-left">
+                  提款金額 (HK$): <span className="text-red-500 font-bold">*</span>
+                </label>
+                <input 
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="請輸入本次提款的自行填寫金額"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl border border-gray-255 text-sm focus:ring-2 text-slate-800 bg-white"
+                  id="withdraw-amount-input"
+                />
+                <div className="text-[10px] text-gray-400 leading-normal text-left">
+                  * 只有提款金額可以由客人自行填寫，其他資料皆隨您綁定的信用預設資料遞交。
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="px-4 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-600 text-xs font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingTx}
+                  className="px-6 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:bg-gray-400"
+                >
+                  {submittingTx ? "放款提交中..." : "確認提款申請"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Admin Edit Profile Balance & Details Modal */}
+      {editingProfile && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="modal-edit-profile-wrapper">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-gray-150 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+              <h3 className="text-sm font-extrabold text-slate-955 flex items-center gap-1.5 font-sans">
+                <Edit3 size={16} className="text-amber-500" />
+                <span>編輯會員餘額與託管商戶資訊</span>
+              </h3>
+              <button 
+                onClick={() => setEditingProfile(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                id="btn-close-edit-profile"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfileEdit} className="space-y-4" id="form-edit-profile">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 text-left">會員姓名:</label>
+                <input 
+                  type="text"
+                  required
+                  value={editProfileName}
+                  onChange={(e) => setEditProfileName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-gray-705 text-left">帳戶可用餘額 (HK$):</label>
+                  <span className="text-[10px] text-amber-600 font-bold font-sans">後台任意修改 ✓</span>
+                </div>
+                <input 
+                  type="text"
+                  required
+                  value={editProfileBalance}
+                  onChange={(e) => setEditProfileBalance(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white font-mono font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 text-left">預設收款銀行 (恆生/中銀/FPS等):</label>
+                <input 
+                  type="text"
+                  value={editProfileBankName}
+                  onChange={(e) => setEditProfileBankName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 text-left">預設收款銀行戶口號碼 / 帳戶:</label>
+                <input 
+                  type="text"
+                  value={editProfileBankNumber}
+                  onChange={(e) => setEditProfileBankNumber(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-gray-700 text-left">電話號碼:</label>
+                  <input 
+                    type="text"
+                    value={editProfilePhone}
+                    onChange={(e) => setEditProfilePhone(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-gray-700 text-left">登記電郵:</label>
+                  <input 
+                    type="email"
+                    value={editProfileEmail}
+                    onChange={(e) => setEditProfileEmail(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-100 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setEditingProfile(null)}
+                  className="px-4 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-600 text-xs font-bold transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProfileEdit}
+                  className="px-6 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+                >
+                  {savingProfileEdit ? "保存中..." : "保存帳資設定"}
                 </button>
               </div>
             </form>

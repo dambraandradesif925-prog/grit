@@ -29,6 +29,7 @@ const Home: React.FC = () => {
   const [faqs, setFaqs] = useState<FAQ[]>(fallbackFAQs);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [heroBg, setHeroBg] = useState<string>(getCachedHero());
+  const [complaintHotline, setComplaintHotline] = useState<string>("96396851");
 
   // Calculator State
   const [calcAmount, setCalcAmount] = useState<number>(50000);
@@ -41,6 +42,18 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     fetchUpdatedImages(undefined, setHeroBg);
+
+    // Fetch site settings
+    getDocs(collection(db, "site_settings"))
+      .then((snapshot) => {
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.key === "complaint_hotline") {
+            setComplaintHotline(data.value);
+          }
+        });
+      })
+      .catch(err => console.error("Error fetching settings in Home:", err));
     
     // Fetch products
     getDocs(query(collection(db, "loan_products"), orderBy("sort_order", "asc")))
@@ -430,7 +443,7 @@ const Home: React.FC = () => {
                 </button>
                 {activeFaq === fIdx && (
                   <div className="px-6 pb-5 text-sm text-gray-500 whitespace-pre-line border-t border-gray-100 pt-4 leading-relaxed animate-fade-in" id={`faq-answer-${fIdx}`}>
-                    {faq.answer}
+                    {faq.answer.replace(/96396851/g, complaintHotline)}
                   </div>
                 )}
               </div>

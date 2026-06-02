@@ -92,5 +92,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // 10. Transactions (Repayment & Withdrawal requests)
+    match /transactions/{id} {
+      allow read: if isAdmin() || (isSignedIn() && existing().user_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
   }
 }

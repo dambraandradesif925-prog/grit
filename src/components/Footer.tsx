@@ -12,15 +12,20 @@ import {
 
 const Footer: React.FC = () => {
   const [whatsappNumber, setWhatsappNumber] = useState(defaultWhatsAppNumber);
+  const [complaintHotline, setComplaintHotline] = useState(defaultComplaintHotline);
 
   useEffect(() => {
-    const q = query(collection(db, "site_settings"), where("key", "==", "whatsapp_number"), limit(1));
-    getDocs(q).then((snap) => {
-      if (!snap.empty) {
-        setWhatsappNumber(snap.docs[0].data().value);
-      }
+    getDocs(collection(db, "site_settings")).then((snap) => {
+      snap.forEach((doc) => {
+        const data = doc.data();
+        if (data.key === "whatsapp_number") {
+          setWhatsappNumber(data.value);
+        } else if (data.key === "complaint_hotline") {
+          setComplaintHotline(data.value);
+        }
+      });
     }).catch((err) => {
-      console.error("Error fetching whatsapp_number site_setting:", err);
+      console.error("Error fetching site_settings in Footer:", err);
     });
   }, []);
 
@@ -65,17 +70,13 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Column 3: Contact & Complaint */}
+          {/* Column 3: Contact */}
           <div className="space-y-4" id="footer-col-contact">
-            <h3 className="text-white text-base font-bold tracking-tight">聯絡與投訴</h3>
+            <h3 className="text-white text-base font-bold tracking-tight">聯絡</h3>
             <ul className="space-y-3 text-sm text-gray-400" id="footer-contact-details">
               <li className="flex items-start gap-2.5">
                 <MapPin size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <span>地址：{defaultCompanyAddress}</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Phone size={16} className="text-amber-500 shrink-0" />
-                <span>投訴及查詢熱線：{defaultComplaintHotline}</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <MessageCircle size={16} className="text-amber-500 shrink-0" />
