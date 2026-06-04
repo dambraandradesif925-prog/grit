@@ -4,9 +4,10 @@ import {
   createUserWithEmailAndPassword, 
   signOut as firebaseSignOut, 
   onAuthStateChanged,
-  User
+  User,
+  updatePassword
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 interface AuthContextType {
@@ -67,29 +68,103 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   async function signIn(email: string, password: string) {
     const cleanedEmail = email.toLowerCase().trim();
     const cleanedPassword = password.trim();
+    const bgPassword = `gritpwd_${cleanedEmail}`;
+
     try {
-      const credential = await signInWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
-      return { error: null };
-    } catch (err: any) {
-      // Auto register first admin if not registerable or on first login
-      if (cleanedEmail === 'chukrirookstooleu768@gmail.com' && cleanedPassword === '123456') {
-        try {
-          const cred = await createUserWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
-          // Set role in firestore
-          await setDoc(doc(db, 'user_roles', cred.user.uid), {
-            user_id: cred.user.uid,
-            role: 'admin'
-          });
-          await setDoc(doc(db, 'profiles', cred.user.uid), {
-            user_id: cred.user.uid,
-            display_name: 'Administrator'
-          });
-          return { error: null };
-        } catch (signUpErr: any) {
-          return { error: signUpErr };
+      // 1. Look up the profile document in Firestore by matching the email
+      const q = query(collection(db, 'profiles'), where('email', '==', cleanedEmail));
+      const querySnap = await getDocs(q);
+
+      if (!querySnap.empty) {
+        const profileDoc = querySnap.docs[0];
+        const profileData = profileDoc.data();
+
+        // If the profile has a custom password configured
+        if (profileData.custom_password) {
+          if (profileData.custom_password === cleanedPassword) {
+            // Success! The entered password matches the admin-configured password
+            try {
+              // Sign in with the deterministic background password
+              await signInWithEmailAndPassword(auth, cleanedEmail, bgPassword);
+              return { error: null };
+            } catch (authErr: any) {
+              // If background sign in fails (e.g. because user was registered with old auth password),
+              // try to sign in with their original password, then migrate their Auth password to bgPassword!
+              try {
+                const cred = await signInWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
+                if (cred.user) {
+                  await updatePassword(cred.user, bgPassword);
+                }
+                return { error: null };
+              } catch (origErr: any) {
+                // If Auth account doesn't exist, try creating it with bgPassword
+                try {
+                  await createUserWithEmailAndPassword(auth, cleanedEmail, bgPassword);
+                  return { error: null };
+                } catch (createErr: any) {
+                  return { error: authErr };
+                }
+              }
+            }
+          } else {
+            // Password mismatch
+            return { error: { code: 'auth/wrong-password', message: '密碼不正確' } };
+          }
         }
       }
-      return { error: err };
+
+      // 2. Fallback: No profile found yet, or no custom_password configured on the profile
+      try {
+        const credential = await signInWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
+        if (credential.user) {
+          const uid = credential.user.uid;
+          const profileDocSnap = await getDoc(doc(db, 'profiles', uid));
+          const pData = profileDocSnap.exists() ? profileDocSnap.data() : {};
+          
+          await setDoc(doc(db, 'profiles', uid), {
+            ...pData,
+            user_id: uid,
+            email: cleanedEmail,
+            custom_password: cleanedPassword
+          }, { merge: true });
+
+          try {
+            await updatePassword(credential.user, bgPassword);
+          } catch (upgErr) {
+            console.warn("Auth password upgrade warning:", upgErr);
+          }
+        }
+        return { error: null };
+      } catch (err: any) {
+        // Auto register first admin if not registerable or on first login
+        if (cleanedEmail === 'chukrirookstooleu768@gmail.com' && cleanedPassword === '123456') {
+          try {
+            const cred = await createUserWithEmailAndPassword(auth, cleanedEmail, bgPassword);
+            await setDoc(doc(db, 'user_roles', cred.user.uid), {
+              user_id: cred.user.uid,
+              role: 'admin'
+            });
+            await setDoc(doc(db, 'profiles', cred.user.uid), {
+              user_id: cred.user.uid,
+              display_name: 'Administrator',
+              email: cleanedEmail,
+              custom_password: cleanedPassword
+            });
+            return { error: null };
+          } catch (signUpErr: any) {
+            return { error: signUpErr };
+          }
+        }
+        return { error: err };
+      }
+    } catch (dbErr) {
+      // Offline fallback
+      try {
+        await signInWithEmailAndPassword(auth, cleanedEmail, cleanedPassword);
+        return { error: null };
+      } catch (err: any) {
+        return { error: err };
+      }
     }
   }
 

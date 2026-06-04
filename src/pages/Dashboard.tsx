@@ -17,7 +17,7 @@ import {
 import { 
   User, CheckCircle, Clock, AlertTriangle, Play, Save, 
   RefreshCw, KanbanSquare, Pencil, Sparkles, BookOpen, 
-  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign, X,
+  Search, Trash2, Edit3, Settings, ShieldAlert, ArrowRight, DollarSign, X, Key,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -90,6 +90,7 @@ const Dashboard: React.FC = () => {
   const [repaymentDay, setRepaymentDay] = useState('');
   const [loanNumber, setLoanNumber] = useState('');
   const [clientName, setClientName] = useState('');
+  const [clientCustomPassword, setClientCustomPassword] = useState('');
   const [applicationStatus, setApplicationStatus] = useState('已批准');
   const [savingApproval, setSavingApproval] = useState(false);
 
@@ -126,6 +127,7 @@ const Dashboard: React.FC = () => {
   const [editProfileBankNumber, setEditProfileBankNumber] = useState('');
   const [editProfilePhone, setEditProfilePhone] = useState('');
   const [editProfileEmail, setEditProfileEmail] = useState('');
+  const [editProfilePassword, setEditProfilePassword] = useState('');
   const [savingProfileEdit, setSavingProfileEdit] = useState(false);
 
   // Helper to parse serialized approved metadata
@@ -342,8 +344,22 @@ const Dashboard: React.FC = () => {
   };
 
   // Admin action: open the approval form for a specific application
-  const openApprovalModal = (app: any) => {
+  const openApprovalModal = async (app: any) => {
     setApprovingApp(app);
+    setClientCustomPassword(''); // Reset first
+    
+    if (app.email) {
+      try {
+        const q = query(collection(db, "profiles"), where("email", "==", app.email.toLowerCase().trim()));
+        const querySnap = await getDocs(q);
+        if (!querySnap.empty) {
+          setClientCustomPassword(querySnap.docs[0].data().custom_password || '');
+        }
+      } catch (err: any) {
+        console.warn("Could not load client profile password:", err.message);
+      }
+    }
+
     const meta = parseApprovalMetadata(app.previous_applications) || {};
     
     setClientName(meta.client_name || app.name_chinese || '');
@@ -402,6 +418,44 @@ const Dashboard: React.FC = () => {
         });
       } catch (appError: any) {
         throw new Error("更新申請狀態失敗: " + appError.message);
+      }
+
+      // 1.5 Sync/Update custom password in profiles collection in Firestore if provided
+      if (approvingApp.email) {
+        try {
+          const appEmail = approvingApp.email.toLowerCase().trim();
+          const qProfile = query(collection(db, "profiles"), where("email", "==", appEmail));
+          const snapProfile = await getDocs(qProfile);
+          
+          if (!snapProfile.empty) {
+            const profileId = snapProfile.docs[0].id;
+            await setDoc(doc(db, "profiles", profileId), {
+              custom_password: clientCustomPassword.trim()
+            }, { merge: true });
+          } else if (clientCustomPassword.trim()) {
+            // Auto generate a profile for them since password was supplied but profile doesn't exist
+            const newUserId = approvingApp.user_id || `user_${Math.floor(100000 + Math.random() * 900000)}`;
+            await setDoc(doc(db, "profiles", newUserId), {
+              user_id: newUserId,
+              email: appEmail,
+              display_name: clientName || approvingApp.name_chinese || '未命名',
+              phone: approvingApp.phone || '',
+              custom_password: clientCustomPassword.trim(),
+              balance: '0'
+            }, { merge: true });
+            
+            await setDoc(doc(db, "user_roles", newUserId), {
+              user_id: newUserId,
+              role: "member"
+            }, { merge: true });
+
+            await updateDoc(doc(db, "loan_applications", approvingApp.id), {
+              user_id: newUserId
+            });
+          }
+        } catch (pwdErr: any) {
+          console.warn("Could not sync profile password during approval:", pwdErr.message);
+        }
       }
 
       // 2. Insert record in loan_accounts if approved
@@ -615,6 +669,7 @@ const Dashboard: React.FC = () => {
         bank_number: editProfileBankNumber.trim() || '未設定',
         phone: editProfilePhone.trim(),
         email: editProfileEmail.trim(),
+        custom_password: editProfilePassword.trim(),
         updated_at: new Date().toISOString()
       }, { merge: true });
 
@@ -650,6 +705,7 @@ const Dashboard: React.FC = () => {
     setEditProfileBankNumber(profile.bank_number || '未設定');
     setEditProfilePhone(profile.phone || '');
     setEditProfileEmail(profile.email || '');
+    setEditProfilePassword(profile.custom_password || '');
   };
 
   // Admin action: save updated settings in tables
@@ -2050,6 +2106,91 @@ const Dashboard: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                <div className="border-t border-amber-200/40 pt-4">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-600 font-bold mb-3">
+                    <Key size={13} />
+                    <span>🔑 客戶登入帳戶密碼設定 (Client Credentials)</span>
+                  </div>
+                  <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3.5 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-800 mb-1.5">
+                        設定/變更客戶之會員登入密碼:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={clientCustomPassword}
+                          onChange={(e) => setClientCustomPassword(e.target.value)}
+                          placeholder="請設定該客戶登入系統之密碼（至少 6 位字元）"
+                          className="flex-1 h-9 px-2.5 rounded-lg border border-amber-200 text-xs text-slate-800 font-mono bg-white focus:ring-1 focus:ring-amber-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!clientCustomPassword.trim()) {
+                              alert("請輸入要設定的新密碼！");
+                              return;
+                            }
+                            if (clientCustomPassword.trim().length < 6) {
+                              alert("密碼長度必須至少有 6 個字元！");
+                              return;
+                            }
+                            try {
+                              const appEmail = approvingApp.email?.toLowerCase().trim();
+                              if (!appEmail) {
+                                alert("客戶未有登記電郵位址，無法設定密碼。");
+                                return;
+                              }
+                              
+                              // Query profile in Firestore
+                              const qProfile = query(collection(db, "profiles"), where("email", "==", appEmail));
+                              const snapProfile = await getDocs(qProfile);
+                              
+                              if (!snapProfile.empty) {
+                                const profileId = snapProfile.docs[0].id;
+                                await setDoc(doc(db, "profiles", profileId), {
+                                  custom_password: clientCustomPassword.trim()
+                                }, { merge: true });
+                                alert("✓ 密碼已成功即時修改！客戶隨時可以使用此新密碼登入。");
+                              } else {
+                                // Auto generate profile
+                                const newUserId = approvingApp.user_id || `user_${Math.floor(100000 + Math.random() * 900000)}`;
+                                await setDoc(doc(db, "profiles", newUserId), {
+                                  user_id: newUserId,
+                                  email: appEmail,
+                                  display_name: clientName || approvingApp.name_chinese || '未命名',
+                                  phone: approvingApp.phone || '',
+                                  custom_password: clientCustomPassword.trim(),
+                                  balance: '0'
+                                }, { merge: true });
+                                
+                                await setDoc(doc(db, "user_roles", newUserId), {
+                                  user_id: newUserId,
+                                  role: "member"
+                                }, { merge: true });
+
+                                await updateDoc(doc(db, "loan_applications", approvingApp.id), {
+                                  user_id: newUserId
+                                });
+                                alert("✓ 客戶登入帳戶已成功建立，並且登入密碼設定為：" + clientCustomPassword.trim());
+                              }
+                            } catch (err: any) {
+                              alert("修改密碼發生錯誤: " + err.message);
+                            }
+                          }}
+                          className="px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors shrink-0 flex items-center gap-1 active:scale-95 shadow-xs"
+                        >
+                          <CheckCircle size={12} />
+                          <span>即時儲存變更</span>
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-amber-600 mt-1.5 font-sans leading-relaxed">
+                        您可隨時在此對密碼進行修更，變更將直接、即時適用於該客戶的登入帳戶。（密碼長度最少為 6 位）
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Submit panel */}
@@ -2525,6 +2666,17 @@ const Dashboard: React.FC = () => {
                     className="w-full h-10 px-3 rounded-lg border border-gray-250 text-xs text-slate-800 bg-white font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-amber-600 text-left">🔑 變更會員登入密碼 (Login Password):</label>
+                <input 
+                  type="text"
+                  value={editProfilePassword}
+                  onChange={(e) => setEditProfilePassword(e.target.value)}
+                  placeholder="請設定該會員之登入密碼"
+                  className="w-full h-10 px-3 rounded-lg border border-amber-200 text-xs text-slate-800 bg-amber-500/5 font-mono"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-100 mt-6">
