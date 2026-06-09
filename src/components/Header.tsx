@@ -4,7 +4,7 @@ import { ChevronDown, Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
-import { LoanProduct } from '../types';
+import { LoanProduct, fallbackProducts } from '../types';
 
 import { getCachedLogo, fetchUpdatedImages } from '../lib/siteImages';
 
@@ -24,7 +24,7 @@ export const logoUrl = "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
 const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
-  const [products, setProducts] = useState<Pick<LoanProduct, 'slug' | 'title'>[]>([]);
+  const [products, setProducts] = useState<Pick<LoanProduct, 'slug' | 'title'>[]>(fallbackProducts);
   const [logo, setLogo] = useState(getCachedLogo());
   const dropdownRef = useRef<HTMLDivElement>(null);
   
@@ -41,7 +41,9 @@ const Header: React.FC = () => {
           slug: doc.data().slug,
           title: doc.data().title
         })) as Pick<LoanProduct, 'slug' | 'title'>[];
-        setProducts(prodData);
+        if (prodData.length > 0) {
+          setProducts(prodData);
+        }
       })
       .catch((err) => {
         console.error("Error fetching header products:", err);

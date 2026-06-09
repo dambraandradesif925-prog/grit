@@ -11,7 +11,7 @@ import {
   fallbackAdvantages, 
   fallbackFAQs 
 } from '../types';
-import { ChevronDown, HelpCircle, Check, DollarSign, Calculator, Star, Clock, AlertCircle } from 'lucide-react';
+import { ChevronDown, HelpCircle, Check, DollarSign, Calculator, Star, Clock, AlertCircle, MapPin, ShieldCheck } from 'lucide-react';
 
 // The six custom testimonials retrieved from the original JS bundle
 const testimonials = [
@@ -553,15 +553,30 @@ const Home: React.FC = () => {
                 />
               </div>
 
-              <div className="text-sm space-y-2 text-gray-600 leading-relaxed font-medium">
-                <p className="flex items-center gap-2">
-                  <span className="bg-amber-100 text-amber-500 font-bold px-2 py-0.5 rounded text-[11px] font-mono">港鐵地鐵站</span>
-                  <span>金鐘站 A 出口，直達海富中心，步行約 1 分鐘即可抵達第 1 座。</span>
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="bg-amber-100 text-amber-500 font-bold px-2 py-0.5 rounded text-[11px] font-mono">放債資格</span>
-                  <span>我們是香港放債人牌照正式認可財務單位，信審程序嚴苛且安全合約透明。</span>
-                </p>
+              <div className="space-y-4 pt-2">
+                <div className="flex gap-3.5 items-start bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 rounded-xl p-4 transition-colors">
+                  <div className="p-2 rounded-lg bg-amber-100 text-amber-600 shrink-0 mt-0.5">
+                    <MapPin size={18} />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <h4 className="text-xs font-black text-amber-700 tracking-wider">港鐵地鐵站 (MTR STATION)</h4>
+                    <p className="text-sm text-gray-700 leading-relaxed font-sans">
+                      金鐘站 A 出口，直達海富中心，步行約 1 分鐘即可抵達第 1 座。
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3.5 items-start bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 rounded-xl p-4 transition-colors">
+                  <div className="p-2 rounded-lg bg-amber-100 text-amber-600 shrink-0 mt-0.5">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <h4 className="text-xs font-black text-amber-700 tracking-wider">放債資格 (REGULATED CREDENTIALS)</h4>
+                    <p className="text-sm text-gray-700 leading-relaxed font-sans">
+                      我們是香港放債人牌照正式認可財務單位，信審程序嚴苛且安全合約透明。
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
