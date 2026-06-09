@@ -12,7 +12,8 @@ import {
   defaultCompanyAddress,
   defaultLicenseNumber,
   defaultComplaintHotline,
-  fallbackProducts
+  fallbackProducts,
+  LoanProduct
 } from '../types';
 import { 
   User, CheckCircle, Clock, AlertTriangle, Play, Save, 
@@ -62,7 +63,7 @@ const Dashboard: React.FC = () => {
   const [logoInput, setLogoInput] = useState('');
   const [heroInput, setHeroInput] = useState('');
   const [savingImages, setSavingImages] = useState(false);
-  const [productsImages, setProductsImages] = useState<{ id: string, slug: string, title: string, image_url: string }[]>([]);
+  const [productsImages, setProductsImages] = useState<LoanProduct[]>([]);
   const [savingProductImgSlug, setSavingProductImgSlug] = useState<string | null>(null);
 
   // Client member custom application states
@@ -222,23 +223,13 @@ const Dashboard: React.FC = () => {
         try {
           const productsSnap = await getDocs(query(collection(db, "loan_products"), orderBy("sort_order", "asc")));
           if (!productsSnap.empty) {
-            setProductsImages(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+            setProductsImages(productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanProduct)));
           } else {
-            setProductsImages(fallbackProducts.map(p => ({
-              id: p.id,
-              slug: p.slug,
-              title: p.title,
-              image_url: p.image_url
-            })));
+            setProductsImages(fallbackProducts);
           }
         } catch (dbErr) {
           console.error("Error loading products in dashboard", dbErr);
-          setProductsImages(fallbackProducts.map(p => ({
-            id: p.id,
-            slug: p.slug,
-            title: p.title,
-            image_url: p.image_url
-          })));
+          setProductsImages(fallbackProducts);
         }
       } else {
         // --- Client Member Dashboard Load ---
@@ -763,30 +754,43 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Admin action: save updated loan product image
-  const handleSaveProductImage = async (slug: string, newUrl: string) => {
+  // Admin action: save updated loan product fields (Title, description, content, image URL)
+  const handleSaveProductImage = async (slug: string, updatedFields: Partial<LoanProduct>) => {
     setSavingProductImgSlug(slug);
     try {
       // Find the document for the product with this slug
       const q = query(collection(db, "loan_products"), where("slug", "==", slug), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        await updateDoc(doc(db, "loan_products", snap.docs[0].id), { image_url: newUrl });
+        await updateDoc(doc(db, "loan_products", snap.docs[0].id), updatedFields as any);
       } else {
+        // Find defaults from fallback
+        const fallback = fallbackProducts.find(p => p.slug === slug) || {
+          id: slug,
+          slug,
+          title: slug,
+          description: '',
+          content: '',
+          sort_order: 10,
+          image_url: ''
+        };
         // Create document using slug as key
         await setDoc(doc(db, "loan_products", slug), {
+          id: fallback.id || slug,
           slug,
-          image_url: newUrl,
-          title: slug === 'personal' ? '個人信用貸款' : slug === 'owner' ? '業主特快私人貸款' : '中小企融資計劃',
-          sort_order: slug === 'personal' ? 1 : slug === 'owner' ? 2 : 3
+          title: updatedFields.title ?? fallback.title,
+          description: updatedFields.description ?? fallback.description,
+          content: updatedFields.content ?? fallback.content,
+          sort_order: fallback.sort_order ?? 10,
+          image_url: updatedFields.image_url ?? fallback.image_url
         });
       }
 
-      setToastMessage("✓ 貸款產品封面圖片更新成功！");
+      setToastMessage("✓ 貸款產品修改儲存成功！");
       setTimeout(() => setToastMessage(''), 3000);
       loadDashboardData();
     } catch (err: any) {
-      alert("產品圖片儲存失敗：" + err.message);
+      alert("產品內容儲存失敗：" + err.message);
     } finally {
       setSavingProductImgSlug(null);
     }
@@ -1488,14 +1492,14 @@ const Dashboard: React.FC = () => {
                 <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-6">
                   <div className="border-b border-gray-100 pb-3 flex items-center gap-2 select-none">
                     <ImageIcon className="text-amber-500" size={18} />
-                    <h3 className="text-base font-bold text-gray-900">官方貸款融資產品封面照片設定</h3>
+                    <h3 className="text-base font-bold text-gray-900">官方貸款融資項目及分頁介紹字句管理</h3>
                   </div>
 
                   <p className="text-xs text-gray-400">
-                    設定貸款產品的大圖或列表形象封面（將同步渲染在官網主頁的借支項目特色卡片中）。
+                    設定與更改４個官方貸款產品之最新名稱、首頁簡短特色句子、列表封面背景相片，以及點入該分頁詳情內的所有網頁中文字細節（支援 Markdown 標籤，例如分行、## 標題、- 列表點）。
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     {productsImages.map((prod) => (
                       <ProductImageRow 
                         key={prod.id} 
@@ -2694,49 +2698,108 @@ const Dashboard: React.FC = () => {
 };
 
 interface ProductImageRowProps {
-  product: { id: string, slug: string, title: string, image_url: string };
-  onSave: (slug: string, newUrl: string) => Promise<void>;
+  product: LoanProduct;
+  onSave: (slug: string, updatedFields: Partial<LoanProduct>) => Promise<void>;
   isSaving: boolean;
 }
 
 const ProductImageRow: React.FC<ProductImageRowProps> = ({ product, onSave, isSaving }) => {
-  const [url, setUrl] = useState(product.image_url);
+  const [title, setTitle] = useState(product.title || '');
+  const [description, setDescription] = useState(product.description || '');
+  const [content, setContent] = useState(product.content || '');
+  const [url, setUrl] = useState(product.image_url || '');
+
+  // Sync state with product prop updates
+  useEffect(() => {
+    setTitle(product.title || '');
+    setDescription(product.description || '');
+    setContent(product.content || '');
+    setUrl(product.image_url || '');
+  }, [product]);
+
+  const isChanged = title !== (product.title || '') ||
+                    description !== (product.description || '') ||
+                    content !== (product.content || '') ||
+                    url !== (product.image_url || '');
 
   return (
-    <div className="p-4 border border-gray-100 rounded-xl bg-gray-50 flex flex-col sm:flex-row gap-4" id={`prod-img-row-${product.slug}`}>
-      <div className="w-full sm:w-28 h-20 border border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center shrink-0 shadow-inner">
-        {url ? (
-          <img 
-            src={url} 
-            alt={product.title} 
-            className="w-full h-full object-cover" 
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg';
-            }}
-          />
-        ) : (
-          <span className="text-xs text-gray-400">無預覽</span>
-        )}
+    <div className="p-5 border border-gray-150 rounded-2xl bg-gray-50 flex flex-col gap-4 text-left leading-normal" id={`prod-edit-card-${product.slug}`}>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="w-full sm:w-28 h-20 border border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center shrink-0 shadow-inner">
+          {url ? (
+            <img 
+              src={url} 
+              alt={title || product.title} 
+              className="w-full h-full object-cover" 
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg';
+              }}
+            />
+          ) : (
+            <span className="text-xs text-gray-400">無預覽</span>
+          )}
+        </div>
+        <div className="flex-1 space-y-1.5">
+          <h4 className="text-xs font-black uppercase text-amber-600 tracking-wider">
+            方案識別碼 (SLUG): <span className="font-mono text-gray-600">{product.slug}</span>
+          </h4>
+          <div className="grid grid-cols-1 gap-2">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">方案標題 / 產品名稱</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="輸入貸款產品項目標題"
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-amber-500 text-slate-800 font-bold"
+              />
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="flex-1 flex flex-col justify-between space-y-2">
+
+      <div className="space-y-3">
         <div>
-          <h4 className="text-xs font-extrabold text-slate-800 mb-1">{product.title} ({product.slug})</h4>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">外層簡短描述 (Description)</label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="輸入首頁展示的簡短字句"
+            className="w-full h-9 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-amber-500 text-slate-800"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">封面形象圖片 URL (Image URL)</label>
           <input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="貼上貸款產品封面圖 URL"
-            className="w-full h-9 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 text-slate-800"
+            placeholder="輸入產品封面背景圖 URL"
+            className="w-full h-9 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-amber-500 text-slate-800 font-mono"
           />
         </div>
-        <div className="flex justify-end">
+
+        <div>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">分頁內詳情說明 (支援換行 / 網文細節內容)</label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="輸入分頁內的所有宣傳推廣與說明細則網文字句"
+            rows={10}
+            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-amber-500 text-slate-800 font-mono leading-relaxed"
+          />
+        </div>
+
+        <div className="flex justify-end pt-1">
           <button
-            onClick={() => onSave(product.slug, url)}
-            disabled={isSaving || url === product.image_url}
-            className="px-3 h-8 rounded-md bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 text-white text-[10px] font-bold tracking-wider uppercase transition-all flex items-center gap-1 shadow-sm"
+            onClick={() => onSave(product.slug, { title, description, content, image_url: url })}
+            disabled={isSaving || !isChanged}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-gray-100 disabled:text-gray-400 text-white text-xs font-bold tracking-wider uppercase transition-all flex items-center gap-1.5 shadow-sm"
           >
-            <Save size={10} />
-            {isSaving ? "更新中..." : "保存項目圖"}
+            <Save size={12} />
+            {isSaving ? "保存中..." : "儲存此方案全部修改"}
           </button>
         </div>
       </div>
