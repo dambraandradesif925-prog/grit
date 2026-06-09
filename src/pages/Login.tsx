@@ -72,14 +72,6 @@ const Login: React.FC = () => {
       const { error } = await signIn(emailToUse, password);
 
       if (error) {
-        // If demo credentials, allow mock access to the interface with a friendly bypass warning!
-        if (emailToUse.toLowerCase() === 'demo@grit-credit.com' && password === 'demo123') {
-          setSuccessMsg("✓ 驗證成功！正在登入測試帳戶...");
-          setTimeout(() => {
-            navigate("/dashboard");
-          }, 1000);
-          return;
-        }
         const errorDetail = error.code ? `[${error.code}] ${error.message}` : (error.message || String(error));
         setErrorMsg(`電郵 / 貸款編號或密碼錯誤，請重新核對。（錯誤詳情: ${errorDetail}）`);
       } else {
@@ -180,20 +172,7 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          {/* Test Demo helper tips */}
-          <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 text-xs text-amber-950 font-medium space-y-1.5 leading-normal" id="login-helper-tips">
-            <p className="font-bold flex items-center gap-1 text-amber-700">
-              <Info size={14} className="shrink-0" />
-              <span>測試登入體驗提示 (Demo Accounts)：</span>
-            </p>
-            <p className="text-gray-600 text-[11px] leading-relaxed">
-              因尚未簽署正式借貸本合同的用戶，可用上方自選密碼建立新檔，或使用下方測試數據直登中心體驗：
-            </p>
-            <div className="pt-1.5 font-mono text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded">
-              <p>· 測試電郵：<span className="text-amber-600 font-bold">demo@grit-credit.com</span></p>
-              <p>· 測試密碼：<span className="text-amber-600 font-bold">demo123</span></p>
-            </div>
-          </div>
+
 
           <div className="text-center pt-2 select-none">
             <Link 
