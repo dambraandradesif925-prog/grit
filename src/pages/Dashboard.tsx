@@ -1710,7 +1710,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {clientAccounts.map((acc, idx) => (
+                    {clientAccounts.slice(0, 1).map((acc, idx) => (
                       <div key={idx} className="border border-gray-150 rounded-xl p-5 bg-gray-50/50 hover:bg-gray-50/10 transition-colors grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-sm leading-normal">
                         <div className="space-y-1">
                           <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">貸款合約編號</div>
@@ -2436,16 +2436,6 @@ const Dashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmitRepay} className="space-y-5" id="form-repay">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-gray-750 uppercase tracking-wider text-left">
-                  我們的收款轉數快帳戶 (FPS Account):
-                </label>
-                <div className="bg-amber-500/10 text-amber-900 px-4 py-3 rounded-xl border border-amber-500/20 text-xs font-extrabold font-mono tracking-wider flex items-center justify-between">
-                  <span>FPS ID: 96396851</span>
-                  <span className="bg-amber-500 text-white font-sans text-[10px] px-2 py-0.5 rounded uppercase">收款專用</span>
-                </div>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-gray-750 uppercase tracking-wider text-left">
                   請填寫您轉賬的客人在用 FPS 帳戶 / 付款流水號:
