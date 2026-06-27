@@ -132,6 +132,6 @@ export const fallbackFAQs: FAQ[] = [
 
 export const defaultWhatsAppNumber = "85291440242";
 export const defaultThankYouMsg = "請留意你填寫的電郵以及電話，客戶服務主任會盡快聯絡你。";
-export const defaultLicenseNumber = "1841/2025";
+export const defaultLicenseNumber = "43/2026";
 export const defaultCompanyAddress = "香港夏愨道18號海富中心座1201室";
 export const defaultComplaintHotline = "96396851";

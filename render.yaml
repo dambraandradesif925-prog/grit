@@ -1,3 +1,4 @@
+schemaVersion: 1
 # Render Blueprint config to automatically handle React SPA routes
 services:
   - type: web
