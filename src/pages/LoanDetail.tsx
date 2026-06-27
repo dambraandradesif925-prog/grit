@@ -149,7 +149,7 @@ const LoanDetail: React.FC = () => {
               <div className="flex items-center gap-2 border-b border-white/10 pb-4">
                 <ShieldCheck className="text-amber-500" size={22} />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-amber-500">
-                  富毅信譽保證
+                  譽高信譽保證
                 </h3>
               </div>
 

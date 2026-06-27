@@ -145,7 +145,7 @@ const OnlineApply: React.FC = () => {
           
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 text-emerald-800 text-sm leading-relaxed text-left space-y-3 font-medium">
             <p className="font-bold border-b border-emerald-200 pb-2">
-              ✓ 親愛的客戶，您好：富毅信貸工作團隊已收到您的線上信貸審批申請表。
+              ✓ 親愛的客戶，您好：譽高信貸工作團隊已收到您的線上信貸審批申請表。
             </p>
             <p className="whitespace-pre-line text-xs leading-normal">
               {thankYouMsg}
@@ -569,13 +569,13 @@ const OnlineApply: React.FC = () => {
 
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 text-xs text-gray-500 leading-relaxed space-y-3 max-h-48 overflow-y-scroll" id="apply-legal-terms-text">
               <p>
-                本人確認本人已滿十八歲，並證實本人已參閱及明白富毅信貸有限公司的私隱政策聲明及個人資料(客戶)聲明。同時，本人同意富毅信貸有限公司使用本人已填寫的個人資料聯絡本人，以跟進貸款事宜。
+                本人確認本人已滿十八歲，並證實本人已參閱及明白譽高信貸(香港)有限公司的私隱政策聲明及個人資料(客戶)聲明。同時，本人同意譽高信貸(香港)有限公司使用本人已填寫的個人資料聯絡本人，以跟進貸款事宜。
               </p>
               <p>
-                同意富毅信貸有限公司在審批貸款申請及以後向本人之信貸狀況進行審核時，可向信貸機構（包括環聯資訊有限公司 TransUnion）提出要求索取本人之信貸報告，而此審核可定期按月進行。
+                同意譽高信貸(香港)有限公司在審批貸款申請及以後向本人之信貸狀況進行審核時，可向信貸機構（包括環聯資訊有限公司 TransUnion）提出要求索取本人之信貸報告，而此審核可定期按月進行。
               </p>
               <p>
-                富毅信貸有限公司對貸款申請批核與否有絕對決定權，而毋須作任何解釋。 富毅信貸有限公司備受個人隱私保護法例監管，我們承諾絕不會透露其填寫之資料給予任何無關第三方，亦絕對不將客戶私隱數據與其他商業機構進行任何形式的交換以謀取任何商業利益。
+                譽高信貸(香港)有限公司對貸款申請批核與否有絕對決定權，而毋須作任何解釋。 譽高信貸(香港)有限公司備受個人隱私保護法例監管，我們承諾絕不會透露其填寫之資料給予任何無關第三方，亦絕對不將客戶私隱數據與其他商業機構進行任何形式的交換以謀取任何商業利益。
               </p>
               <p>
                 本公司保留隨時變更或終止貸款利息優惠之權益、以及對此筆借貸額度合約的最終核准與否權。

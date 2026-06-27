@@ -17,7 +17,7 @@ const TermsOfUse: React.FC = () => {
             使用條款與免責聲明
           </h1>
           <p className="text-xs sm:text-sm text-gray-300 leading-normal mt-1.5 animate-fade-in">
-            在使用富毅信貸有限公司 (GRIT CREDIT LIMITED) 本網站前，請細閱下列條款。
+            在使用譽高信貸(香港)有限公司 (Paramount Credit (h.k.) Limited) 本網站前，請細閱下列條款。
           </p>
         </div>
 
@@ -33,7 +33,7 @@ const TermsOfUse: React.FC = () => {
               <span>使用條款之修訂權</span>
             </h2>
             <p className="pl-6">
-              富毅信貸有限公司 ("本公司") 保留隨時對本使用條款進行修訂、修改、增加及刪減內容的權利。任何內容修訂一經在本網網頁發佈即告即時生效。本公司強烈建議客戶不定期瀏覽及仔細翻閱此網頁，留意本公司最新公布的使用條款 updates，以確保取得最新資訊。
+              譽高信貸(香港)有限公司 ("本公司") 保留隨時對本使用條款進行修訂、修改、增加及刪減內容的權利。任何內容修訂一經在本網網頁發佈即告即時生效。本公司強烈建議客戶不定期瀏覽及仔細翻閱此網頁，留意本公司最新公布的使用條款 updates，以確保取得最新資訊。
             </p>
 
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5 pt-2">
@@ -52,10 +52,10 @@ const TermsOfUse: React.FC = () => {
               <span>合法經營及放債人牌照約定</span>
             </h2>
             <p className="pl-6">
-              本網站所載各項信貸產品和融資服務，均由富毅信貸有限公司按照香港特別行政區《放債人條例》（香港法例第163章）的發牌規管，在合法註冊司法管轄區合法提供。
+              本網站所載各項信貸產品和融資服務，均由譽高信貸(香港)有限公司按照香港特別行政區《放債人條例》（香港法例第163章）的發牌規管，在合法註冊司法管轄區合法提供。
             </p>
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-xs font-semibold pl-6 space-y-1.5">
-              <p>放債人機構：富毅信貸有限公司 (GRIT CREDIT LIMITED)</p>
+              <p>放債人機構：譽高信貸(香港)有限公司 (Paramount Credit (h.k.) Limited)</p>
               <p>官方註冊牌照號碼：{defaultLicenseNumber}</p>
               <p>營業大廈地址：{defaultCompanyAddress}</p>
             </div>
@@ -66,7 +66,7 @@ const TermsOfUse: React.FC = () => {
               <Info size={14} className="text-amber-500" />
               <span>本政策最後修訂日：二零二五年</span>
             </span>
-            <span className="font-semibold text-[10px]">GRIT CREDIT LIMITED COPYRIGHTS</span>
+            <span className="font-semibold text-[10px]">Paramount Credit (h.k.) Limited COPYRIGHTS</span>
           </footer>
         </div>
 

@@ -16,7 +16,7 @@ const PrivacyPolicy: React.FC = () => {
             私隱政策與個人資料聲明
           </h1>
           <p className="text-xs sm:text-sm text-gray-300 leading-normal mt-1.5">
-            富毅信貸有限公司 (GRIT CREDIT LIMITED) 致力在提供服務時保障每位尊貴客戶的個人私隱與敏感信貸檔案數據。
+            譽高信貸(香港)有限公司 (Paramount Credit (h.k.) Limited) 致力在提供服務時保障每位尊貴客戶的個人私隱與敏感信貸檔案數據。
           </p>
         </div>
 
@@ -35,13 +35,13 @@ const PrivacyPolicy: React.FC = () => {
           <section className="space-y-4 text-sm text-gray-600 leading-relaxed font-medium">
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 space-y-5" id="privacy-points-list">
               <p>
-                1. 客戶在申請開立戶口，延續戶口及建立或延續財務信貸便利或要求富毅信貸有限公司（以下簡稱「富毅」）提供信貸服務時，需要不時向富毅提供有關的資料。
+                1. 客戶在申請開立戶口，延續戶口及建立或延續財務信貸便利或要求譽高信貸(香港)有限公司（以下簡稱「譽高」）提供信貸服務時，需要不時向譽高提供有關的資料。
               </p>
               <p>
-                2. 客戶若未能提供有關資料將導致富毅無法開立或延續戶口或建立或延續財務信貸便利或提供信貸服務。
+                2. 客戶若未能提供有關資料將導致譽高無法開立或延續戶口或建立或延續財務信貸便利或提供信貸服務。
               </p>
               <p>
-                3. 在客戶與富毅的正常業務往來過程中，富毅亦會收集客戶資料，例如在客戶以信貸交易時。
+                3. 在客戶與譽高的正常業務往來過程中，譽高亦會收集客戶資料，例如在客戶以信貸交易時。
               </p>
               <p>
                 4. 有關客戶資料將可作以下用途：
@@ -77,7 +77,7 @@ const PrivacyPolicy: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-2 text-xs">
                   <span className="text-amber-500 font-bold">VIII.</span>
-                  <span>確定富毅對客戶或客戶對富毅的債務；</span>
+                  <span>確定譽高對客戶或客戶對譽高的債務；</span>
                 </li>
                 <li className="flex items-start gap-2 text-xs">
                   <span className="text-amber-500 font-bold">IX.</span>
@@ -89,12 +89,12 @@ const PrivacyPolicy: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-2 text-xs">
                   <span className="text-amber-500 font-bold">XI.</span>
-                  <span>根據富毅或其分行須遵守的條例要求作出披露；</span>
+                  <span>根據譽高或其分行須遵守的條例要求作出披露；</span>
                 </li>
               </ul>
               
               <p className="border-t border-gray-150 pt-4" id="privacy-transunion">
-                9. 個人信貸機構查詢：富毅信貸可定期要求自合法信貸資訊庫（如 TransUnion）提取客戶之信貸評分報告。如客戶欲存取或修改其報告，請聯絡：
+                9. 個人信貸機構查詢：譽高信貸可定期要求自合法信貸資訊庫（如 TransUnion）提取客戶之信貸評分報告。如客戶欲存取或修改其報告，請聯絡：
               </p>
               <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-4 text-xs space-y-1 text-gray-700 font-bold pl-6">
                 <p>I. 環聯資訊有限公司 (TransUnion Limited)</p>

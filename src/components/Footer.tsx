@@ -37,8 +37,8 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Column 1: Company Profile */}
           <div className="space-y-4" id="footer-col-about">
-            <h3 className="text-white text-base font-bold tracking-tight">富毅信貸有限公司</h3>
-            <p className="text-xs font-mono text-gray-400 tracking-wider">GRIT CREDIT LIMITED</p>
+            <h3 className="text-white text-base font-bold tracking-tight">譽高信貸(香港)有限公司</h3>
+            <p className="text-xs font-mono text-gray-400 tracking-wider">Paramount Credit (h.k.) Limited</p>
             <p className="text-sm text-gray-400 leading-relaxed max-w-sm">
               本公司於2016年創辦，作為一間本地合規私人財務融資服務機構，致力為每位顧客提供高質稱心、快速省心的融資及個人信貸解決方案。
             </p>
@@ -93,7 +93,7 @@ const Footer: React.FC = () => {
             <span>忠告：借錢梗要還，咪俾錢中介。</span>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed">
-            版權所有 © {new Date().getFullYear()} 富毅信貸有限公司 (GRIT CREDIT LIMITED)。系統開發與託管服務。
+            版權所有 © {new Date().getFullYear()} 譽高信貸(香港)有限公司 (Paramount Credit (h.k.) Limited)。系統開發與託管服務。
           </p>
         </div>
       </div>

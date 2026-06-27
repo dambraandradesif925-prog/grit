@@ -75,7 +75,7 @@ const Login: React.FC = () => {
         const errorDetail = error.code ? `[${error.code}] ${error.message}` : (error.message || String(error));
         setErrorMsg(`電郵 / 貸款編號或密碼錯誤，請重新核對。（錯誤詳情: ${errorDetail}）`);
       } else {
-        setSuccessMsg("✓ 歡迎登入富毅信貸！正在跳轉...");
+        setSuccessMsg("✓ 歡迎登入譽高信貸！正在跳轉...");
         setTimeout(() => {
           navigate("/dashboard");
         }, 1000);
@@ -98,14 +98,14 @@ const Login: React.FC = () => {
           <div className="flex flex-col items-center mb-4 select-none">
             <img 
               src={logo} 
-              alt="富毅信貸有限公司" 
+              alt="譽高信貸(香港)有限公司" 
               className="h-16 w-auto object-contain mb-3" 
               onError={(e) => {
                 (e.target as HTMLImageElement).style.opacity = '1';
               }}
             />
-            <h2 className="text-xl font-bold text-gray-900 tracking-tight">富毅信貸有限公司</h2>
-            <p className="text-xs text-gray-500 font-mono tracking-wider tracking-widest uppercase">GRIT CREDIT LIMITED</p>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">譽高信貸(香港)有限公司</h2>
+            <p className="text-xs text-gray-500 font-mono tracking-wider tracking-widest uppercase">Paramount Credit (h.k.) Limited</p>
           </div>
 
           <div className="border-b border-gray-100 pb-3">

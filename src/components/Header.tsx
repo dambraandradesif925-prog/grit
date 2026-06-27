@@ -19,7 +19,7 @@ const navItems = [
   { label: "聯絡我們", href: "/", hash: "contact" }
 ];
 
-export const logoUrl = "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+export const logoUrl = "https://www.image2url.com/r2/default/images/1782552560598-be980894-9587-4282-a090-92a9620d2aec.png";
 
 const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -111,7 +111,7 @@ const Header: React.FC = () => {
           <Link to="/" className="flex items-center gap-2 shrink-0" id="nav-logo-link">
             <img 
               src={logo} 
-              alt="富毅信貸有限公司" 
+              alt="譽高信貸(香港)有限公司" 
               className="h-10 w-auto object-contain" 
               id="nav-logo-img"
               onError={(e) => {
@@ -120,8 +120,8 @@ const Header: React.FC = () => {
               }}
             />
             <div className="flex flex-col select-none" id="nav-brand-text">
-              <span className="text-sm font-bold text-gray-900 tracking-tight">富毅信貸有限公司</span>
-              <span className="text-[9px] text-gray-500 font-mono tracking-wider">GRIT CREDIT LIMITED</span>
+              <span className="text-sm font-bold text-gray-900 tracking-tight">譽高信貸(香港)有限公司</span>
+              <span className="text-[9px] text-gray-500 font-mono tracking-wider">Paramount Credit (h.k.) Limited</span>
             </div>
           </Link>
 

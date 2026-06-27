@@ -1,7 +1,7 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
-export const fallbackLogo = "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+export const fallbackLogo = "https://www.image2url.com/r2/default/images/1782552560598-be980894-9587-4282-a090-92a9620d2aec.png";
 export const fallbackHero = "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
 
 export function getCachedLogo(): string {

@@ -210,7 +210,7 @@ const Dashboard: React.FC = () => {
             });
 
             // Logo & Hero Images
-            const logoVal = settingsData.find(s => s.key === "logo_url")?.value || "https://grit-credit.com/assets/logo-D_TUe9TF.jpg";
+            const logoVal = settingsData.find(s => s.key === "logo_url")?.value || "https://www.image2url.com/r2/default/images/1782552560598-be980894-9587-4282-a090-92a9620d2aec.png";
             const heroVal = settingsData.find(s => s.key === "hero_background_url")?.value || "https://www.image2url.com/r2/default/images/1776426806509-5b7fb5f2-959c-4fdf-97c7-c7ba8d67a14e.jpg";
             setLogoInput(logoVal);
             setHeroInput(heroVal);
@@ -354,7 +354,7 @@ const Dashboard: React.FC = () => {
     const meta = parseApprovalMetadata(app.previous_applications) || {};
     
     setClientName(meta.client_name || app.name_chinese || '');
-    setLoanNumber(meta.loan_number || `GRIT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setLoanNumber(meta.loan_number || `PARAMOUNT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
     setApprovedLoanAmount(meta.approved_amount || app.loan_amount || '');
     setOutstandingPrincipal(meta.outstanding_principal || app.loan_amount || '');
     setTotalBalance(meta.total_balance || (app.loan_amount * 1.1).toFixed(0) || '');
@@ -833,7 +833,7 @@ const Dashboard: React.FC = () => {
               {isAdmin ? "總監系統平台 (SYSTEM CONSOLE)" : "信貸帳戶面版 (CLIENT PORTAL)"}
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              {isAdmin ? "富毅信貸管理控制中心" : `您好，${displayName}`}
+              {isAdmin ? "譽高信貸管理控制中心" : `您好，${displayName}`}
             </h1>
             <p className="text-xs text-gray-300">
               安全管理身分登入會話：{user?.email} · 在線受加密保障
@@ -1430,7 +1430,7 @@ const Dashboard: React.FC = () => {
                         <div className="flex gap-4">
                           <div className="w-16 h-16 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center shrink-0">
                             {logoInput ? (
-                              <img src={logoInput} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://grit-credit.com/assets/logo-D_TUe9TF.jpg'; }} />
+                              <img src={logoInput} alt="Logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = 'https://www.image2url.com/r2/default/images/1782552560598-be980894-9587-4282-a090-92a9620d2aec.png'; }} />
                             ) : (
                               <span className="text-xs text-gray-400">無預覽</span>
                             )}
@@ -1718,7 +1718,7 @@ const Dashboard: React.FC = () => {
                       <div key={idx} className="border border-gray-150 rounded-xl p-5 bg-gray-50/50 hover:bg-gray-50/10 transition-colors grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-sm leading-normal">
                         <div className="space-y-1">
                           <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">貸款合約編號</div>
-                          <div className="font-bold text-gray-900">{acc.loan_number || `GRIT-${acc.id.substring(0, 6)}`}</div>
+                          <div className="font-bold text-gray-900">{acc.loan_number || `PARAMOUNT-${acc.id.substring(0, 6)}`}</div>
                         </div>
                         <div className="space-y-1">
                           <div className="text-[11px] text-gray-400 font-bold uppercase font-sans">未還清結欠餘額</div>
@@ -1881,7 +1881,7 @@ const Dashboard: React.FC = () => {
                 </p>
                 <div className="pt-2">
                   <a
-                    href="https://wa.me/85291440242?text=你好，我是富毅信貸會員，我想加速審批我的特快信貸申請表"
+                    href="https://wa.me/85291440242?text=你好，我是譽高信貸會員，我想加速審批我的特快信貸申請表"
                     target="_blank"
                     rel="noopener noreferrer referrerPolicy=no-referrer"
                     className="flex items-center justify-center gap-1.5 w-full py-3 rounded-lg bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-xs uppercase tracking-wider shadow"
@@ -1898,7 +1898,7 @@ const Dashboard: React.FC = () => {
                 </h4>
                 <div className="text-xs text-gray-500 space-y-1.5 leading-normal font-medium">
                   <p>1. 切勿隨意洩漏您的登密碼，以防止敏感信貸歷史遭冒名盗查。</p>
-                  <p>2. 富毅信貸絕對不會在未經書面授權下，洩漏您的資料與 TU 信評軌跡給無關三方。</p>
+                  <p>2. 譽高信貸絕對不會在未經書面授權下，洩漏您的資料與 TU 信評軌跡給無關三方。</p>
                 </div>
               </div>
             </div>
@@ -1978,7 +1978,7 @@ const Dashboard: React.FC = () => {
                     value={loanNumber}
                     onChange={(e) => setLoanNumber(e.target.value)}
                     required
-                    placeholder="例如：GRIT-2026-9876"
+                    placeholder="例如：PARAMOUNT-2026-9876"
                     className="w-full h-10 px-3 rounded-lg border border-gray-200 text-xs focus:ring-2 font-mono font-bold text-slate-800"
                   />
                 </div>

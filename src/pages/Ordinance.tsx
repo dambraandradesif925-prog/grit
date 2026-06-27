@@ -97,7 +97,7 @@ const Ordinance: React.FC = () => {
               <BookOpen size={14} className="text-amber-500" />
               <span>本摘要節選自香港立法院官方編印之《放債人條例》說明。</span>
             </span>
-            <span className="font-semibold text-[10px]">MLO GRIT CREDIT</span>
+            <span className="font-semibold text-[10px]">MLO PARAMOUNT CREDIT</span>
           </footer>
         </div>
 
