@@ -1,12 +1,8 @@
 schemaVersion: 1
-# Render Blueprint config to automatically handle React SPA routes
+# Render Blueprint config to serve React SPA via Express server
 services:
   - type: web
     name: grit-credit
-    env: static
-    buildCommand: npm run build
-    publishPath: ./dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
