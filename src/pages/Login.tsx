@@ -27,45 +27,13 @@ const Login: React.FC = () => {
     setSuccessMsg('');
     setLoading(true);
 
-    let emailToUse = identifier.trim();
-    if (emailToUse.includes("@")) {
-      emailToUse = emailToUse.toLowerCase();
-    }
+    const emailToUse = identifier.trim().toLowerCase();
 
     try {
-      // If the identifier is a loan number or phone (does not contain @), search Firestore
       if (!emailToUse.includes("@")) {
-        console.log("Checking Firestore for phone match...");
-        // Check if there's a loan application with this phone number
-        const qPhone = query(collection(db, "loan_applications"), where("phone", "==", emailToUse), limit(1));
-        const snapPhone = await getDocs(qPhone);
-
-        if (!snapPhone.empty) {
-          emailToUse = snapPhone.docs[0].data().email;
-        } else {
-          console.log("Checking Firestore for loan number match...");
-          // Check if there's a loan account with this loan number
-          const qLoan = query(collection(db, "loan_accounts"), where("loan_number", "==", emailToUse), limit(1));
-          const snapLoan = await getDocs(qLoan);
-
-          if (!snapLoan.empty) {
-            const uid = snapLoan.docs[0].data().user_id;
-            // Lookup application with this user_id to find email
-            const qUid = query(collection(db, "loan_applications"), where("user_id", "==", uid), limit(1));
-            const snapUid = await getDocs(qUid);
-            if (!snapUid.empty) {
-              emailToUse = snapUid.docs[0].data().email;
-            } else {
-              setErrorMsg("找不到與此貸款編號或手機號碼對應的帳戶，請核對重試。");
-              setLoading(false);
-              return;
-            }
-          } else {
-            setErrorMsg("找不到與此貸款編號或手機號碼對應的帳戶，請核對重試。");
-            setLoading(false);
-            return;
-          }
-        }
+        setErrorMsg("請輸入有效的電郵地址。");
+        setLoading(false);
+        return;
       }
 
       // Perform auth sign in
@@ -73,7 +41,7 @@ const Login: React.FC = () => {
 
       if (error) {
         const errorDetail = error.code ? `[${error.code}] ${error.message}` : (error.message || String(error));
-        setErrorMsg(`電郵 / 貸款編號或密碼錯誤，請重新核對。（錯誤詳情: ${errorDetail}）`);
+        setErrorMsg(`電郵地址或密碼錯誤，請重新核對。（錯誤詳情: ${errorDetail}）`);
       } else {
         setSuccessMsg("✓ 歡迎登入譽高信貸！正在跳轉...");
         setTimeout(() => {
@@ -132,14 +100,14 @@ const Login: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Mail size={12} className="text-slate-400" />
-                <span>電郵地址 / 貸款編號 Email / Loan No.</span>
+                <span>電郵地址 Email Address</span>
               </label>
               <input 
-                type="text"
+                type="email"
                 required
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="請輸入註冊時填寫的電郵或編號"
+                placeholder="請輸入註冊時填寫的電郵地址"
                 className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-800"
                 id="login-input-identifier"
               />

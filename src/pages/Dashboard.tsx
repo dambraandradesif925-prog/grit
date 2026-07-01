@@ -12,6 +12,7 @@ import {
   defaultCompanyAddress,
   defaultLicenseNumber,
   defaultComplaintHotline,
+  defaultFaqWhatsapp,
   fallbackProducts,
   LoanProduct
 } from '../types';
@@ -55,7 +56,8 @@ const Dashboard: React.FC = () => {
     thankYouMsg: defaultThankYouMsg,
     license: defaultLicenseNumber,
     address: defaultCompanyAddress,
-    hotline: defaultComplaintHotline
+    hotline: defaultComplaintHotline,
+    faqWhatsapp: defaultFaqWhatsapp
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -200,13 +202,15 @@ const Dashboard: React.FC = () => {
             const l = settingsData.find(s => s.key === "license_number")?.value || defaultLicenseNumber;
             const a = settingsData.find(s => s.key === "company_address")?.value || defaultCompanyAddress;
             const h = settingsData.find(s => s.key === "complaint_hotline")?.value || defaultComplaintHotline;
+            const fqW = settingsData.find(s => s.key === "faq_whatsapp")?.value || defaultFaqWhatsapp;
             
             setSettingsForm({
               whatsapp: w,
               thankYouMsg: t,
               license: l,
               address: a,
-              hotline: h
+              hotline: h,
+              faqWhatsapp: fqW
             });
 
             // Logo & Hero Images
@@ -709,7 +713,8 @@ const Dashboard: React.FC = () => {
         { key: "registration_thank_you", value: settingsForm.thankYouMsg },
         { key: "license_number", value: settingsForm.license },
         { key: "company_address", value: settingsForm.address },
-        { key: "complaint_hotline", value: settingsForm.hotline }
+        { key: "complaint_hotline", value: settingsForm.hotline },
+        { key: "faq_whatsapp", value: settingsForm.faqWhatsapp }
       ];
 
       await Promise.all(operations.map(async (op) => {
@@ -1350,6 +1355,23 @@ const Dashboard: React.FC = () => {
                         className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 text-slate-800"
                         id="setting-hotline"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                        💬 常問問題第九項 WhatsApp 號碼 (例如: 96396851)
+                      </label>
+                      <input 
+                        type="text"
+                        value={settingsForm.faqWhatsapp}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, faqWhatsapp: e.target.value })}
+                        required
+                        className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:ring-2 text-slate-800"
+                        id="setting-faq-whatsapp"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">此號碼將直接應用在首頁「貸款常問問題」第九項答案中</p>
                     </div>
                   </div>
 

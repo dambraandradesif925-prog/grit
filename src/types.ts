@@ -135,3 +135,4 @@ export const defaultThankYouMsg = "請留意你填寫的電郵以及電話，客
 export const defaultLicenseNumber = "43/2026";
 export const defaultCompanyAddress = "香港夏愨道18號海富中心座1201室";
 export const defaultComplaintHotline = "96396851";
+export const defaultFaqWhatsapp = "96396851";
